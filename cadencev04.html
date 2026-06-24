@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cadence — Strategic Leadership Associates</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  html, body { margin: 0; padding: 0; background: #F2F5F1; }
+  #root { min-height: 100vh; }
+  #loading { font-family: system-ui, sans-serif; color: #69736D; padding: 40px; }
+</style>
+</head>
+<body>
+<div id="root"><div id="loading">Loading Cadence…</div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+
+<script type="text/babel" data-presets="react">
+
+/* ---------------- icon shim (Font Awesome stand-ins for the original icon set) ---------------- */
+const { useState, useEffect, useMemo } = React;
+
+function makeIcon(faClass) {
+  return function IconCmp({ size = 16, className = "", style = {}, title, strokeWidth, ...rest }) {
+    return React.createElement("i", {
+      className: (faClass + " " + className).trim(),
+      style: { fontSize: size + "px", lineHeight: 1, display: "inline-block", ...style },
+      title,
+      ...rest,
+    });
+  };
+}
+
+const LayoutDashboard = makeIcon("fa-solid fa-gauge-high");
+const ClipboardList   = makeIcon("fa-solid fa-clipboard-list");
+const Users           = makeIcon("fa-solid fa-users");
+const Calendar        = makeIcon("fa-solid fa-calendar-days");
+const Building2       = makeIcon("fa-solid fa-building");
+const Files           = makeIcon("fa-solid fa-folder-open");
+const Lock            = makeIcon("fa-solid fa-lock");
+const Plus            = makeIcon("fa-solid fa-plus");
+const Clock           = makeIcon("fa-solid fa-clock");
+const X               = makeIcon("fa-solid fa-xmark");
+const AlertTriangle   = makeIcon("fa-solid fa-triangle-exclamation");
+const Pencil          = makeIcon("fa-solid fa-pen");
+const Trash2          = makeIcon("fa-solid fa-trash");
+const Eye             = makeIcon("fa-solid fa-eye");
+const EyeOff          = makeIcon("fa-solid fa-eye-slash");
+const ChevronRight    = makeIcon("fa-solid fa-chevron-right");
+const ChevronLeft     = makeIcon("fa-solid fa-chevron-left");
+const Check           = makeIcon("fa-solid fa-check");
+const CircleDot       = makeIcon("fa-solid fa-circle-dot");
+const Megaphone       = makeIcon("fa-solid fa-bullhorn");
+const Globe           = makeIcon("fa-solid fa-globe");
+const Linkedin        = makeIcon("fa-brands fa-linkedin");
+const Instagram       = makeIcon("fa-brands fa-instagram");
+const Twitter         = makeIcon("fa-brands fa-x-twitter");
+const Facebook        = makeIcon("fa-brands fa-facebook");
+const Youtube         = makeIcon("fa-brands fa-youtube");
+const Settings        = makeIcon("fa-solid fa-gear");
+const Ban             = makeIcon("fa-solid fa-ban");
+const ExternalLink    = makeIcon("fa-solid fa-up-right-from-square");
+const Sparkles        = makeIcon("fa-solid fa-wand-magic-sparkles");
+const Play            = makeIcon("fa-solid fa-play");
+const Pause           = makeIcon("fa-solid fa-pause");
+const ArrowRight      = makeIcon("fa-solid fa-arrow-right");
+const ArrowLeft       = makeIcon("fa-solid fa-arrow-left");
+const UserPlus        = makeIcon("fa-solid fa-user-plus");
+const DollarSign      = makeIcon("fa-solid fa-dollar-sign");
+const ShieldCheck     = makeIcon("fa-solid fa-shield-halved");
+const Repeat          = makeIcon("fa-solid fa-rotate");
+const Award           = makeIcon("fa-solid fa-award");
+const User            = makeIcon("fa-solid fa-user");
+const Database        = makeIcon("fa-solid fa-database");
+const Download        = makeIcon("fa-solid fa-download");
+const Upload          = makeIcon("fa-solid fa-upload");
+const RotateCcw       = makeIcon("fa-solid fa-rotate-left");
+const Bell            = makeIcon("fa-solid fa-bell");
+const AtSign          = makeIcon("fa-solid fa-at");
+const Link2           = makeIcon("fa-solid fa-link");
+const Receipt         = makeIcon("fa-solid fa-receipt");
+const Wallet          = makeIcon("fa-solid fa-wallet");
+
+
+/* ---------------- persistence ---------------- */
+const STORE_KEY = "cadence:data:v1";
+async function loadData() {
+  try { if (typeof window !== "undefined" && window.storage) { const r = await window.storage.get(STORE_KEY); if (r && r.value) return JSON.parse(r.value); } } catch (e) {}
+  try { if (typeof localStorage !== "undefined") { const raw = localStorage.getItem(STORE_KEY); if (raw) return JSON.parse(raw); } } catch (e) {}
+  return null;
+}
+async function saveData(d) {
+  try { if (typeof window !== "undefined" && window.storage) { await window.storage.set(STORE_KEY, JSON.stringify(d)); return; } } catch (e) {}
+  try { if (typeof localStorage !== "undefined") localStorage.setItem(STORE_KEY, JSON.stringify(d)); } catch (e) {}
+}
+
+const uid = () => Math.random().toString(36).slice(2, 9);
+const pad = (n) => String(n).padStart(2, "0");
+const isoOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const today = new Date();
+const todayIso = isoOf(today);
+const dayOffset = (n) => isoOf(new Date(today.getFullYear(), today.getMonth(), today.getDate() + n));
+const CURRENT_MONTH = todayIso.slice(0, 7);
+const money = (n) => "$" + Math.round(n).toLocaleString();
+
+// 12-hour time display for stored "HH:MM" (24h) values
+function fmt12(t) {
+  if (!t) return "—";
+  const [h, m] = t.split(":").map(Number);
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+// Time zones: a curated list covering common US + client zones, with short display labels
+const TIMEZONES = [
+  { id: "America/New_York", label: "Eastern (ET)" },
+  { id: "America/Chicago", label: "Central (CT)" },
+  { id: "America/Denver", label: "Mountain (MT)" },
+  { id: "America/Los_Angeles", label: "Pacific (PT)" },
+  { id: "America/Anchorage", label: "Alaska (AKT)" },
+  { id: "Pacific/Honolulu", label: "Hawaii (HT)" },
+  { id: "Europe/London", label: "UK (GMT/BST)" },
+  { id: "Europe/Paris", label: "Central Europe (CET)" },
+  { id: "Asia/Kolkata", label: "India (IST)" },
+  { id: "Asia/Tokyo", label: "Japan (JST)" },
+  { id: "Australia/Sydney", label: "Sydney (AEST)" },
+  { id: "UTC", label: "UTC" },
+];
+const tzLabel = (id) => TIMEZONES.find((z) => z.id === id)?.label || id;
+function tzOffsetMinutes(date, timeZone) {
+  try {
+    const dtf = new Intl.DateTimeFormat("en-US", { timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const parts = dtf.formatToParts(date).reduce((acc, p) => { acc[p.type] = p.value; return acc; }, {});
+    const asUTC = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), Number(parts.hour), Number(parts.minute), Number(parts.second));
+    return (asUTC - date.getTime()) / 60000;
+  } catch (e) { return 0; }
+}
+// Converts a date+"HH:MM" understood to be in fromTz into the equivalent HH:MM in toTz
+function convertTime(dateIso, timeHHMM, fromTz, toTz) {
+  if (!timeHHMM) return null;
+  const [hh, mm] = timeHHMM.split(":").map(Number);
+  const anchor = new Date(dateIso + "T" + timeHHMM + ":00Z");
+  const diff = tzOffsetMinutes(anchor, toTz) - tzOffsetMinutes(anchor, fromTz);
+  const total = hh * 60 + mm + diff;
+  const norm = ((total % 1440) + 1440) % 1440;
+  const dayShift = Math.floor(total / 1440);
+  return { hhmm: `${String(Math.floor(norm / 60)).padStart(2, "0")}:${String(norm % 60).padStart(2, "0")}`, dayShift };
+}
+
+const SERVICE_LINES = ["Employee Training", "Benefits Programs", "Workplace Grievances", "Handbook Audit", "Hiring & Recruiting", "Org Development", "Leadership Development", "Board Training", "Ask HR", "HR Strategy", "HR Education", "Marketing", "Personal Branding", "Social Media", "Content"];
+const STATUSES = ["Not started", "In progress", "Review", "Send Back", "Blocked", "Done"];
+const EVENT_TYPES = ["Ask HR session", "Training", "Board training", "Client meeting", "Workshop", "Content planning"];
+const PLATFORMS = ["LinkedIn", "Instagram", "X", "Facebook", "YouTube", "Other"];
+const SKILLS = ["Investigations", "HR Strategy", "Benefits", "Recruiting", "Training", "Leadership Dev", "Facilitation", "Board Training", "Ask HR", "HR Education", "Compliance", "Content", "Org Development", "Personal Branding", "Social Media"];
+const platIcon = { LinkedIn: Linkedin, Instagram: Instagram, X: Twitter, Facebook: Facebook, YouTube: Youtube, Other: Globe };
+
+/* ---------------- seed ---------------- */
+function seed() {
+  const clients = [
+    { id: "meridian", name: "Meridian Health", retainerRenewal: dayOffset(20), contractHours: 40, contractRate: 9500, timezone: "America/New_York", contacts: [{ name: "Sandra Cole", role: "VP People", email: "scole@meridian.example" }] },
+    { id: "brightline", name: "Brightline Logistics", retainerRenewal: null, contractHours: 30, contractRate: 6800, timezone: "America/Chicago", contacts: [{ name: "Ray Mendez", role: "HR Director", email: "rmendez@brightline.example" }] },
+    { id: "cedar", name: "Cedar Grove Schools", retainerRenewal: dayOffset(40), contractHours: null, contractRate: null, timezone: "America/New_York", contacts: [{ name: "Pat Howell", role: "Superintendent", email: "phowell@cedar.example" }] },
+    { id: "vantage", name: "Vantage Retail Group", retainerRenewal: dayOffset(8), contractHours: 24, contractRate: 5200, timezone: "America/Los_Angeles", contacts: [{ name: "Dana Kim", role: "CHRO", email: "dkim@vantage.example" }] },
+  ];
+  const team = [
+    { id: "dana", name: "Dana Okafor", role: "Principal Consultant", capacity: 130, rate: 285, skills: ["Investigations", "HR Strategy", "Board Training"] },
+    { id: "marcus", name: "Marcus Reyes", role: "Senior HR Consultant", capacity: 138, rate: 225, skills: ["Recruiting", "HR Strategy", "Benefits"] },
+    { id: "priya", name: "Priya Sharma", role: "HR Consultant", capacity: 130, rate: 175, skills: ["Ask HR", "HR Education", "Content"] },
+    { id: "elena", name: "Elena Vargas", role: "Benefits Specialist", capacity: 138, rate: 195, skills: ["Benefits", "Compliance"] },
+    { id: "jordan", name: "Jordan Lee", role: "L&D Consultant", capacity: 130, rate: 200, skills: ["Training", "Leadership Dev", "Facilitation"] },
+  ];
+  const T = (arr) => arr.map(([label, done, assigneeId]) => ({ id: uid(), label, done: !!done, assigneeId: assigneeId || null }));
+  const A = (o) => { const weekly = Object.values(o.alloc).reduce((s, h) => s + h, 0); return { id: uid(), internal: false, confidential: false, notes: "", logged: 0, billable: "unset", approval: null, tasks: [], reviewerId: null, comments: [], links: [], loggedByMonth: {}, ...o, assigneeIds: Object.keys(o.alloc), weekly }; };
+  const assignments = [
+    A({ title: "Handbook audit & revision", clientId: "meridian", serviceLine: "Handbook Audit", alloc: { dana: 60 }, status: "Review", due: dayOffset(4), budget: 40, logged: 22, billable: "billable", approval: { status: "Approved" }, tasks: T([["Collect current policies", 1, "dana"], ["Compliance gap review", 1, "dana"], ["Draft revisions", 0, "dana"], ["Client review cycle", 0], ["Finalize & deliver", 0]]), reviewerId: "marcus", loggedByMonth: { [CURRENT_MONTH]: 9 }, links: [{ id: uid(), label: "Draft handbook (Google Drive)", url: "https://drive.google.com/" }], comments: [{ id: uid(), authorId: "dana", authorLabel: "Dana Okafor", text: "First full draft is ready for a look before it goes to the client.", mentions: ["marcus"], date: new Date(Date.now() - 86400000).toISOString() }], notes: "Phase 1 compliance review underway." }),
+    A({ title: "Grievance investigation", clientId: "cedar", serviceLine: "Workplace Grievances", alloc: { dana: 43 }, status: "In progress", due: dayOffset(2), budget: 30, logged: 12, billable: "billable", confidential: true, approval: { status: "Pending" }, tasks: T([["Intake & scope", 1], ["Interviews", 0], ["Evidence review", 0], ["Findings report", 0], ["Recommendations", 0]]), loggedByMonth: { [CURRENT_MONTH]: 12 }, notes: "Restricted. Interviews in progress." }),
+    A({ title: "Manager training series", clientId: "brightline", serviceLine: "Employee Training", alloc: { jordan: 78 }, status: "In progress", due: dayOffset(9), budget: 60, logged: 30, billable: "billable", notes: "Feedback-skills module next." }),
+    A({ title: "Leadership cohort facilitation", clientId: "meridian", serviceLine: "Leadership Development", alloc: { jordan: 69 }, status: "In progress", due: dayOffset(20), budget: 45, logged: 20, billable: "billable", notes: "Session 3 of 6." }),
+    A({ title: "Open enrollment redesign", clientId: "vantage", serviceLine: "Benefits Programs", alloc: { elena: 30, marcus: 13 }, status: "Review", due: dayOffset(6), budget: 50, logged: 44, billable: "billable", loggedByMonth: { [CURRENT_MONTH]: 16 }, notes: "Joint — Elena leads design, Marcus on comms." }),
+    A({ title: "Recruiting process buildout", clientId: "brightline", serviceLine: "Hiring & Recruiting", alloc: { marcus: 35 }, status: "Not started", due: dayOffset(14), budget: 36, billable: "unset" }),
+    A({ title: "HR strategy roadmap", clientId: "vantage", serviceLine: "HR Strategy", alloc: { marcus: 52 }, status: "In progress", due: dayOffset(18), budget: 40, logged: 18, billable: "billable" }),
+    A({ title: "Board training prep", clientId: "cedar", serviceLine: "Board Training", alloc: { priya: 26 }, status: "Not started", due: dayOffset(25), budget: 24, billable: "billable" }),
+    A({ title: "Ask HR monthly sessions", clientId: "meridian", serviceLine: "Ask HR", alloc: { priya: 17 }, status: "In progress", due: dayOffset(3), budget: 24, logged: 10, billable: "billable", notes: "Recurring." }),
+    A({ title: "LinkedIn thought-leadership series", clientId: null, internal: true, serviceLine: "Social Media", alloc: { marcus: 17, priya: 9 }, status: "In progress", due: dayOffset(7), budget: 30, logged: 11, billable: "nonbillable", notes: "Joint. 3 posts/week." }),
+    A({ title: "Principal personal branding refresh", clientId: null, internal: true, serviceLine: "Personal Branding", alloc: { dana: 13 }, status: "In progress", due: dayOffset(15), budget: 20, logged: 6, billable: "nonbillable" }),
+    A({ title: "Monthly newsletter", clientId: null, internal: true, serviceLine: "Content", alloc: { priya: 13 }, status: "Not started", due: dayOffset(10), budget: 12, billable: "nonbillable" }),
+  ];
+  const events = [
+    { id: uid(), title: "Ask HR — June session", type: "Ask HR session", clientId: "meridian", date: dayOffset(1), time: "10:00", durationHours: 1, memberIds: ["priya"], attendees: "Client HR team", recurrence: "monthly" },
+    { id: uid(), title: "Social content planning", type: "Content planning", clientId: null, date: dayOffset(2), time: "14:00", durationHours: 0.5, memberIds: ["marcus", "priya"], attendees: "", recurrence: "weekly" },
+    { id: uid(), title: "Manager training: feedback skills", type: "Training", clientId: "brightline", date: dayOffset(3), time: "13:00", durationHours: 2, memberIds: ["jordan"], attendees: "12 managers", recurrence: "none" },
+    { id: uid(), title: "Open enrollment kickoff", type: "Client meeting", clientId: "vantage", date: dayOffset(5), time: "15:30", durationHours: 1, memberIds: ["elena", "marcus"], attendees: "", recurrence: "none" },
+    { id: uid(), title: "Leadership cohort — session 3", type: "Workshop", clientId: "meridian", date: dayOffset(8), time: "09:00", durationHours: 2, memberIds: ["jordan"], attendees: "Cohort", recurrence: "none" },
+    { id: uid(), title: "Board governance workshop", type: "Board training", clientId: "cedar", date: dayOffset(12), time: "11:00", durationHours: 1.5, memberIds: ["priya"], attendees: "Board members", recurrence: "none" },
+  ];
+  const availability = [
+    { id: uid(), memberId: "jordan", start: dayOffset(8), end: dayOffset(10), type: "out", note: "PTO" },
+    { id: uid(), memberId: "dana", start: dayOffset(2), end: dayOffset(2), type: "busy", note: "Offsite" },
+  ];
+  const channels = [
+    { id: uid(), platform: "LinkedIn", handle: "Strategic Leadership Associates", url: "https://www.linkedin.com/company/strategic-leadership-associates", followers: 4200 },
+    { id: uid(), platform: "Instagram", handle: "@sla.advisors", url: "https://instagram.com", followers: 1800 },
+    { id: uid(), platform: "X", handle: "@SLA_advisors", url: "https://x.com", followers: 950 },
+  ];
+  const templates = [
+    { id: uid(), name: "Handbook Audit", serviceLine: "Handbook Audit", tasks: [["Collect current policies", 6], ["Compliance gap review", 10], ["Draft revisions", 12], ["Client review cycle", 8], ["Finalize & deliver", 4]] },
+    { id: uid(), name: "Grievance Investigation", serviceLine: "Workplace Grievances", confidential: true, tasks: [["Intake & scope", 4], ["Interviews", 10], ["Evidence review", 6], ["Findings report", 6], ["Recommendations", 4]] },
+    { id: uid(), name: "Training Program", serviceLine: "Employee Training", tasks: [["Needs assessment", 8], ["Build materials", 16], ["Pilot session", 8], ["Full rollout", 20], ["Evaluation", 8]] },
+    { id: uid(), name: "Social Campaign", serviceLine: "Social Media", internal: true, tasks: [["Define goals & audience", 4], ["Content calendar", 6], ["Create assets", 12], ["Schedule & publish", 6], ["Review analytics", 4]] },
+  ];
+  const notifications = [
+    { id: uid(), toMemberId: "marcus", type: "review", assignmentId: assignments[0].id, text: `"${assignments[0].title}" needs your review`, date: new Date(Date.now() - 86400000).toISOString(), read: false },
+  ];
+  const payouts = [];
+  return { firmName: "Strategic Leadership Associates", website: "https://www.strategicleadershipassociates.com", settings: { amberThreshold: 0.85, countStatuses: ["Not started", "In progress", "Review", "Send Back", "Blocked"], firmTimezone: "America/New_York" }, clients, team, assignments, events, availability, channels, templates, notifications, payouts };
+}
+
+function migrate(d) {
+  if (!d) return null;
+  if (!d.firmName || d.firmName === "Your Firm") d.firmName = "Strategic Leadership Associates";
+  if (!d.website) d.website = "https://www.strategicleadershipassociates.com";
+  if (!d.settings) d.settings = { amberThreshold: 0.85, countStatuses: ["Not started", "In progress", "Review", "Send Back", "Blocked"], firmTimezone: "America/New_York" };
+  if (!d.settings.firmTimezone) d.settings.firmTimezone = "America/New_York";
+  if (!d.availability) d.availability = [];
+  if (!d.channels) d.channels = [];
+  if (!d.notifications) d.notifications = [];
+  if (!d.payouts) d.payouts = [];
+  d.team = (d.team || []).map((m) => ({ rate: 0, skills: [], ...m }));
+  d.clients = (d.clients || []).map((c) => ({ retainerRenewal: null, contacts: [], contractHours: null, contractRate: null, timezone: "America/New_York", ...c }));
+  d.assignments = (d.assignments || []).map((a) => {
+    if (!a.assigneeIds) a.assigneeIds = a.assigneeId ? [a.assigneeId] : [];
+    if (!a.alloc) { a.alloc = {}; const n = a.assigneeIds.length || 1; a.assigneeIds.forEach((id) => (a.alloc[id] = (a.weekly || 0) / n)); }
+    const merged = { internal: false, approval: null, tasks: [], reviewerId: null, comments: [], links: [], loggedByMonth: {}, ...a };
+    merged.tasks = (merged.tasks || []).map((t) => ({ assigneeId: null, ...t }));
+    return merged;
+  });
+  d.events = (d.events || []).map((e) => ({ memberIds: [], recurrence: "none", durationHours: 1, ...e }));
+  return d;
+}
+
+/* ---------------- helpers ---------------- */
+const fmtDate = (iso) => iso ? new Date(iso + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "—";
+const daysUntil = (iso) => iso ? Math.round((new Date(iso + "T00:00:00") - new Date(todayIso + "T00:00:00")) / 86400000) : null;
+const utilColor = (r, amber) => (r > 1 ? "alert" : r >= amber ? "amber" : "ok");
+const maskTitle = (a, h) => (a.confidential && h ? "Restricted engagement" : a.title);
+function whoNames(a, member) { const ns = (a.assigneeIds || []).map((id) => member(id)?.name.split(" ")[0]).filter(Boolean); return ns.length ? ns.join(", ") : "Unassigned"; }
+function blendedRate(a, member) { const ids = a.assigneeIds || []; let num = 0, den = 0; ids.forEach((id) => { const m = member(id); const w = a.alloc?.[id] || 0; if (m) { num += w * (m.rate || 0); den += w; } }); return den ? num / den : 0; }
+function revenueOf(a, member) { return a.internal ? 0 : (a.logged || 0) * blendedRate(a, member); }
+function memberShareHours(a, memberId, totalHours) { const wt = a.weekly || 0; if (!wt) return 0; const w = a.alloc?.[memberId] || 0; return (totalHours || 0) * (w / wt); }
+
+// monthly capacity: count weekday "out" days within the current calendar month
+function workingDaysInMonth(year, month) {
+  let days = 0; const last = new Date(year, month + 1, 0).getDate();
+  for (let d = 1; d <= last; d++) { const dow = new Date(year, month, d).getDay(); if (dow !== 0 && dow !== 6) days++; }
+  return days;
+}
+const CURRENT_WORKING_DAYS = workingDaysInMonth(today.getFullYear(), today.getMonth());
+function outDaysThisMonth(memberId, availability) {
+  let n = 0; const y = today.getFullYear(), mo = today.getMonth(); const last = new Date(y, mo + 1, 0).getDate();
+  for (let d = 1; d <= last; d++) {
+    const dt = new Date(y, mo, d); const dow = dt.getDay(); if (dow === 0 || dow === 6) continue;
+    const iso = isoOf(dt);
+    if (availability.some((a) => a.memberId === memberId && a.type === "out" && a.start <= iso && a.end >= iso)) n++;
+  }
+  return n;
+}
+const effectiveCap = (p, availability) => Math.max(1, Math.round(p.capacity * Math.max(0, CURRENT_WORKING_DAYS - Math.min(CURRENT_WORKING_DAYS, outDaysThisMonth(p.id, availability))) / CURRENT_WORKING_DAYS));
+
+// per-member pay breakdown: hours + pay from assignments (their share of logged hours) and events (full meeting duration)
+function memberPayBreakdown(memberId, data) {
+  const items = [];
+  let hoursAll = 0, hoursMonth = 0;
+  data.assignments.forEach((a) => {
+    if (!(a.assigneeIds || []).includes(memberId)) return;
+    const hAll = memberShareHours(a, memberId, a.logged || 0);
+    const hMonth = memberShareHours(a, memberId, (a.loggedByMonth || {})[CURRENT_MONTH] || 0);
+    if (hAll > 0 || hMonth > 0) items.push({ kind: "assignment", id: a.id, label: a.title, sub: a.internal ? "Firm" : (data.clients.find((c) => c.id === a.clientId)?.name || "—"), hoursAll: hAll, hoursMonth: hMonth });
+    hoursAll += hAll; hoursMonth += hMonth;
+  });
+  data.events.forEach((e) => {
+    if (!(e.memberIds || []).includes(memberId)) return;
+    const dur = Number(e.durationHours) || 0;
+    if (dur <= 0) return;
+    const inMonth = e.date && e.date.slice(0, 7) === CURRENT_MONTH;
+    items.push({ kind: "event", id: e.id, label: e.title, sub: e.clientId ? (data.clients.find((c) => c.id === e.clientId)?.name || "—") : "Firm", hoursAll: dur, hoursMonth: inMonth ? dur : 0 });
+    hoursAll += dur; if (inMonth) hoursMonth += dur;
+  });
+  const rate = data.team.find((m) => m.id === memberId)?.rate || 0;
+  return { items, hoursAll, hoursMonth, payAll: hoursAll * rate, payMonth: hoursMonth * rate, rate };
+}
+
+const NAV = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "assignments", label: "Assignments", icon: ClipboardList },
+  { id: "bandwidth", label: "Team & bandwidth", icon: Users },
+  { id: "calendar", label: "Calendar", icon: Calendar },
+  { id: "marketing", label: "Marketing & brand", icon: Megaphone },
+  { id: "financials", label: "Financials", icon: DollarSign, admin: true },
+  { id: "clients", label: "Clients", icon: Building2 },
+  { id: "templates", label: "Templates", icon: Files },
+];
+const TOUR = [
+  { view: "dashboard", title: "Your dashboard", body: "Active work, what's due, who's overloaded, confidential items, and upcoming retainer renewals — at a glance." },
+  { view: "assignments", title: "Assignments", body: "Joint or solo, filterable by client or service line. Partner approval can be switched on per engagement as needed." },
+  { view: "bandwidth", title: "Bandwidth & skills", body: "Customize thresholds and monthly capacity, find people by skill, and see PTO automatically reduce someone's available hours." },
+  { view: "calendar", title: "Calendars & recurrence", body: "Individual or team views, blocked availability, time zone conversion for clients, and events that repeat." },
+  { view: "financials", title: "Financials (admin)", body: "Revenue by client and service line, plus each team member's hours and expected pay. Rates stay private to each person and admins." },
+  { view: "marketing", title: "Marketing & brand", body: "Internal work, social channels, and the firm website — kept separate from client engagements." },
+];
+
+/* ================================================================== */
+function App() {
+  const [data, setData] = useState(null);
+  const [view, setView] = useState("dashboard");
+  const [hideConf, setHideConf] = useState(false);
+  const [modal, setModal] = useState(null);
+  const [tour, setTour] = useState(-1);
+  const [currentUser, setCurrentUser] = useState({ role: "admin", memberId: null });
+  const [notifOpen, setNotifOpen] = useState(false);
+
+  useEffect(() => { let on = true; loadData().then((d) => { if (on) setData(migrate(d) || seed()); }); return () => { on = false; }; }, []);
+  useEffect(() => { if (data) saveData(data); }, [data]);
+  useEffect(() => { if (tour >= 0 && tour < TOUR.length) setView(TOUR[tour].view); }, [tour]);
+
+  const update = (patch) => setData((d) => ({ ...d, ...patch }));
+  const clientName = (id) => data?.clients.find((c) => c.id === id)?.name || "—";
+  const member = (id) => data?.team.find((m) => m.id === id);
+  const clientLabel = (a) => (a.internal ? "Firm" : clientName(a.clientId));
+  const isAdmin = currentUser.role === "admin";
+  const canSeeRate = (pid) => isAdmin || currentUser.memberId === pid;
+
+  const load = useMemo(() => {
+    if (!data) return {};
+    const m = {}; data.team.forEach((p) => (m[p.id] = 0));
+    const counts = data.settings.countStatuses;
+    data.assignments.forEach((a) => { if (!counts.includes(a.status)) return; (a.assigneeIds || []).forEach((id) => { const hrs = a.alloc && a.alloc[id] != null ? a.alloc[id] : (a.weekly || 0) / (a.assigneeIds.length || 1); if (m[id] != null) m[id] += Number(hrs) || 0; }); });
+    return m;
+  }, [data]);
+
+  if (!data) return <div style={{ padding: 40, fontFamily: "Inter, sans-serif", color: "#69736D" }}>Loading…</div>;
+
+  const saveAssignment = (a) => setData((d) => { const ex = d.assignments.some((x) => x.id === a.id); return { ...d, assignments: ex ? d.assignments.map((x) => (x.id === a.id ? a : x)) : [a, ...d.assignments] }; });
+  const delAssignment = (id) => setData((d) => ({ ...d, assignments: d.assignments.filter((x) => x.id !== id) }));
+  const approve = (id) => setData((d) => ({ ...d, assignments: d.assignments.map((a) => (a.id === id ? { ...a, approval: { ...(a.approval || {}), status: "Approved" } } : a)) }));
+  const saveEvent = (e) => setData((d) => { const ex = d.events.some((x) => x.id === e.id); return { ...d, events: ex ? d.events.map((x) => (x.id === e.id ? e : x)) : [...d.events, e] }; });
+  const delEvent = (id) => setData((d) => ({ ...d, events: d.events.filter((x) => x.id !== id) }));
+  const saveAvail = (a) => setData((d) => { const ex = d.availability.some((x) => x.id === a.id); return { ...d, availability: ex ? d.availability.map((x) => (x.id === a.id ? a : x)) : [...d.availability, a] }; });
+  const delAvail = (id) => setData((d) => ({ ...d, availability: d.availability.filter((x) => x.id !== id) }));
+  const saveClient = (c) => setData((d) => { const ex = d.clients.some((x) => x.id === c.id); return { ...d, clients: ex ? d.clients.map((x) => (x.id === c.id ? c : x)) : [...d.clients, c] }; });
+  const saveMember = (m) => setData((d) => { const ex = d.team.some((x) => x.id === m.id); return { ...d, team: ex ? d.team.map((x) => (x.id === m.id ? m : x)) : [...d.team, m] }; });
+  const setCap = (id, cap) => setData((d) => ({ ...d, team: d.team.map((m) => (m.id === id ? { ...m, capacity: cap } : m)) }));
+  const logTime = (id, hrs) => setData((d) => ({ ...d, assignments: d.assignments.map((a) => { if (a.id !== id) return a; const lbm = { ...(a.loggedByMonth || {}) }; lbm[CURRENT_MONTH] = Math.max(0, (lbm[CURRENT_MONTH] || 0) + hrs); return { ...a, logged: Math.max(0, Number(a.logged || 0) + hrs), loggedByMonth: lbm }; }) }));
+  const saveChannel = (c) => setData((d) => ({ ...d, channels: [...d.channels, c] }));
+  const delChannel = (id) => setData((d) => ({ ...d, channels: d.channels.filter((x) => x.id !== id) }));
+  const importData = (obj) => setData(migrate(obj));
+  const resetFresh = () => setData((d) => ({ ...d, clients: [], assignments: [], events: [], availability: [], channels: [], notifications: [], payouts: [] }));
+  const restoreSample = () => setData(seed());
+
+  const postComment = (assignmentId, comment) => setData((d) => {
+    const target = d.assignments.find((x) => x.id === assignmentId);
+    const assignments = d.assignments.map((x) => (x.id === assignmentId ? { ...x, comments: [...(x.comments || []), comment] } : x));
+    const notifs = (comment.mentions || []).filter((id) => id !== comment.authorId).map((id) => ({ id: uid(), toMemberId: id, type: "mention", assignmentId, text: `${comment.authorLabel} tagged you on "${target ? target.title : "an assignment"}"`, date: new Date().toISOString(), read: false }));
+    return { ...d, assignments, notifications: [...d.notifications, ...notifs] };
+  });
+  const notifyReviewer = (assignmentId, reviewerId, title) => { if (!reviewerId) return; setData((d) => ({ ...d, notifications: [...d.notifications, { id: uid(), toMemberId: reviewerId, type: "review", assignmentId, text: `"${title}" needs your review`, date: new Date().toISOString(), read: false }] })); };
+  const markNotifRead = (id) => setData((d) => ({ ...d, notifications: d.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)) }));
+  const recordPayout = (memberId, period, hours, amount) => setData((d) => ({ ...d, payouts: [{ id: uid(), memberId, period, hours, amount, date: todayIso }, ...d.payouts] }));
+  const delPayout = (id) => setData((d) => ({ ...d, payouts: d.payouts.filter((p) => p.id !== id) }));
+  const openNotification = (n) => { markNotifRead(n.id); const a = data.assignments.find((x) => x.id === n.assignmentId); if (a) { setView(a.internal ? "marketing" : "assignments"); setModal({ type: "assignment", payload: a }); } setNotifOpen(false); };
+
+  const myUnread = !isAdmin && currentUser.memberId ? data.notifications.filter((n) => n.toMemberId === currentUser.memberId && !n.read).length : data.notifications.filter((n) => !n.read).length;
+
+  const s = { data, clientName, clientLabel, member, load, setModal, hideConf, setView, update, currentUser, isAdmin, canSeeRate, saveAssignment, delAssignment, approve, saveEvent, delEvent, saveAvail, delAvail, saveClient, setCap, logTime, saveChannel, delChannel, postComment, notifyReviewer, markNotifRead, recordPayout, delPayout };
+
+  return (
+    <div className="cd-root">
+      <style>{CSS}</style>
+      <aside className="cd-side">
+        <div className="cd-brand"><span className="cd-logo">Cadence</span><span className="cd-firm">{data.firmName}</span></div>
+        <nav className="cd-nav">{NAV.map((n) => { const I = n.icon; const locked = n.admin && !isAdmin; return <button key={n.id} className={"cd-navbtn" + (view === n.id ? " on" : "") + (locked ? " locked" : "")} onClick={() => setView(n.id)}><I size={17} strokeWidth={1.9} /><span>{n.label}</span>{locked && <Lock size={12} className="cd-navlock" />}</button>; })}</nav>
+        <div className="cd-side-foot">
+          <select className="cd-roleswitch" value={isAdmin ? "admin" : currentUser.memberId} onChange={(e) => setCurrentUser(e.target.value === "admin" ? { role: "admin", memberId: null } : { role: "member", memberId: e.target.value })}>
+            <option value="admin">Viewing as: Admin</option>
+            {data.team.map((m) => <option key={m.id} value={m.id}>Viewing as: {m.name}</option>)}
+          </select>
+          {!isAdmin && currentUser.memberId && member(currentUser.memberId) && <button className="cd-profile-btn" onClick={() => setModal({ type: "member", payload: member(currentUser.memberId) })}><User size={15} />My profile &amp; rate</button>}
+          {!isAdmin && currentUser.memberId && <button className="cd-profile-btn" onClick={() => setModal({ type: "mypay", payload: currentUser.memberId })}><Wallet size={15} />My pay</button>}
+          <button className="cd-conf-toggle cd-bell-btn" onClick={() => setNotifOpen((v) => !v)}><Bell size={15} />Notifications{myUnread > 0 && <span className="cd-bell-badge">{myUnread}</span>}</button>
+          <button className="cd-conf-toggle" onClick={() => setHideConf((v) => !v)}>{hideConf ? <EyeOff size={15} /> : <Eye size={15} />}{hideConf ? "Confidential hidden" : "Confidential visible"}</button>
+          <button className="cd-tour-btn" onClick={() => setTour(0)}><Sparkles size={15} />Take a tour</button>
+          <button className="cd-conf-toggle" onClick={() => setModal({ type: "data" })}><Database size={15} />Data &amp; backup</button>
+        </div>
+      </aside>
+
+      <main className="cd-main">
+        {view === "dashboard" && <Dashboard {...s} />}
+        {view === "assignments" && <Assignments {...s} />}
+        {view === "bandwidth" && <Bandwidth {...s} />}
+        {view === "calendar" && <CalendarView {...s} />}
+        {view === "marketing" && <Marketing {...s} />}
+        {view === "financials" && (isAdmin ? <Financials {...s} /> : <FinancialsLocked onUnlock={() => setCurrentUser({ role: "admin", memberId: null })} />)}
+        {view === "clients" && <Clients {...s} />}
+        {view === "templates" && <Templates {...s} />}
+        <footer className="cd-foot">Prototype. Your data is saved to this browser only — each visitor has their own private copy, not a shared one. The “Viewing as” switch demonstrates who sees rates and Financials; real per-user enforcement, audit logging, billing sync, and Google/Calendar sync arrive with the deployable version.</footer>
+      </main>
+
+      {modal && <Modals modal={modal} {...s} saveMember={saveMember} importData={importData} resetFresh={resetFresh} restoreSample={restoreSample} />}
+      {notifOpen && <NotificationsPanel notifications={data.notifications} isAdmin={isAdmin} currentUser={currentUser} member={member} onOpen={openNotification} onClose={() => setNotifOpen(false)} />}
+      {tour >= 0 && <Tour i={tour} setTour={setTour} isAdmin={isAdmin} />}
+    </div>
+  );
+}
+
+/* ---------- bits ---------- */
+function Tag({ children, tone = "neutral" }) { return <span className={"cd-tag " + tone}>{children}</span>; }
+function StatusPill({ s }) { const t = s === "Done" ? "ok" : s === "Blocked" ? "alert" : s === "Send Back" ? "sendback" : s === "Review" ? "amber" : s === "In progress" ? "brand" : "neutral"; return <span className={"cd-pill " + t}><CircleDot size={11} strokeWidth={2.4} />{s}</span>; }
+function Bar({ ratio, tone }) { return <div className="cd-bar"><div className={"cd-bar-fill " + tone} style={{ width: Math.min(100, ratio * 100) + "%" }} /></div>; }
+function PageHead({ title, sub, action }) { return <div className="cd-head"><div><h1 className="cd-h1">{title}</h1>{sub && <p className="cd-sub">{sub}</p>}</div>{action}</div>; }
+function NotificationsPanel({ notifications, isAdmin, currentUser, member, onOpen, onClose }) {
+  const list = (isAdmin ? notifications : notifications.filter((n) => n.toMemberId === currentUser.memberId)).slice().sort((a, b) => b.date.localeCompare(a.date));
+  return (
+    <div className="cd-notif-panel">
+      <div className="cd-notif-head"><span>Notifications</span><button className="cd-iconbtn" onClick={onClose}><X size={15} /></button></div>
+      <div className="cd-notif-list">
+        {list.length === 0 && <p className="cd-empty pad">{isAdmin ? "No notifications yet." : "Nothing tagged to you yet."}</p>}
+        {list.map((n) => (
+          <div key={n.id} className={"cd-notif-row" + (n.read ? "" : " unread")} onClick={() => onOpen(n)}>
+            <div className={"cd-notif-ic " + n.type}>{n.type === "review" ? <ShieldCheck size={13} /> : <AtSign size={13} />}</div>
+            <div className="cd-notif-main">
+              {isAdmin && <div className="cd-notif-to">To {member(n.toMemberId)?.name || "—"}</div>}
+              <div className="cd-notif-text">{n.text}</div>
+              <div className="cd-notif-date">{new Date(n.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Dashboard ---------- */
+function Dashboard({ data, load, clientLabel, member, hideConf, setView, setModal }) {
+  const amber = data.settings.amberThreshold;
+  const active = data.assignments.filter((a) => a.status !== "Done");
+  const dueWeek = active.filter((a) => { const d = daysUntil(a.due); return d != null && d <= 7 && d >= 0; });
+  const over = data.team.filter((p) => (load[p.id] || 0) > effectiveCap(p, data.availability));
+  const conf = data.assignments.filter((a) => a.confidential && a.status !== "Done");
+  const pending = active.filter((a) => a.approval && a.approval.status === "Pending");
+  const upcoming = [...data.events].filter((e) => daysUntil(e.date) >= 0).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)).slice(0, 4);
+  const renewals = data.clients.filter((c) => c.retainerRenewal && daysUntil(c.retainerRenewal) >= 0 && daysUntil(c.retainerRenewal) <= 30);
+  const Stat = ({ n, label, tone }) => <div className="cd-stat"><div className={"cd-stat-n " + (tone || "")}>{n}</div><div className="cd-stat-l">{label}</div></div>;
+  return (
+    <>
+      <PageHead title="Dashboard" sub="Where the work stands today." action={<button className="cd-btn primary" onClick={() => setModal({ type: "assignment", payload: null })}><Plus size={16} />New assignment</button>} />
+      {(renewals.length > 0 || pending.length > 0) && <div className="cd-alerts">
+        {renewals.map((c) => <span key={c.id} className="cd-alertchip renew"><Building2 size={13} />Retainer renewal: {c.name} ({daysUntil(c.retainerRenewal)}d)</span>)}
+        {pending.length > 0 && <span className="cd-alertchip approve" onClick={() => setView("assignments")}><ShieldCheck size={13} />{pending.length} awaiting partner approval</span>}
+      </div>}
+      <div className="cd-stats"><Stat n={active.length} label="Active assignments" /><Stat n={dueWeek.length} label="Due this week" tone={dueWeek.length ? "amber" : ""} /><Stat n={over.length} label="Over capacity" tone={over.length ? "alert" : "ok"} /><Stat n={conf.length} label="Confidential open" tone={conf.length ? "plum" : ""} /></div>
+      <div className="cd-grid2">
+        <section className="cd-card">
+          <div className="cd-card-h"><h2 className="cd-h2">Bandwidth check</h2><button className="cd-link" onClick={() => setView("bandwidth")}>Open <ChevronRight size={14} /></button></div>
+          {data.team.map((p) => { const cap = effectiveCap(p, data.availability); const used = load[p.id] || 0; const r = used / cap; return <div key={p.id} className="cd-band-row"><div className="cd-band-name">{p.name.split(" ")[0]}</div><Bar ratio={r} tone={utilColor(r, amber)} /><div className={"cd-band-val " + utilColor(r, amber)}>{Math.round(used)}/{cap}h</div></div>; })}
+        </section>
+        <section className="cd-card">
+          <div className="cd-card-h"><h2 className="cd-h2">Coming up</h2><button className="cd-link" onClick={() => setView("calendar")}>Calendar <ChevronRight size={14} /></button></div>
+          {upcoming.length === 0 && <p className="cd-empty">Nothing scheduled.</p>}
+          {upcoming.map((e) => <div key={e.id} className="cd-up-row"><div className="cd-up-date">{fmtDate(e.date)}<span>{fmt12(e.time)}</span></div><div className="cd-up-main"><div className="cd-up-title">{e.title}{e.recurrence && e.recurrence !== "none" && <Repeat size={11} className="cd-rep" />}</div><div className="cd-up-meta">{e.clientId ? clientLabel({ clientId: e.clientId }) : "Firm"} · {e.type}</div></div></div>)}
+        </section>
+      </div>
+      <section className="cd-card">
+        <div className="cd-card-h"><h2 className="cd-h2">Due this week</h2></div>
+        {dueWeek.length === 0 && <p className="cd-empty">Nothing due in the next seven days.</p>}
+        {dueWeek.sort((a, b) => a.due.localeCompare(b.due)).map((a) => <div key={a.id} className="cd-due-row" onClick={() => setModal({ type: "assignment", payload: a })}><span className="cd-due-when">{daysUntil(a.due) === 0 ? "Today" : daysUntil(a.due) + "d"}</span><span className="cd-due-title">{a.confidential && <Lock size={12} className="cd-lock" />}{maskTitle(a, hideConf)}</span><Tag>{a.serviceLine}</Tag><span className="cd-due-who">{whoNames(a, member)}</span></div>)}
+      </section>
+    </>
+  );
+}
+
+/* ---------- Assignments ---------- */
+function Assignments({ data, clientLabel, member, hideConf, setModal, logTime, internalOnly, isAdmin, approve }) {
+  const [fClient, setFClient] = useState("all");
+  const [fLine, setFLine] = useState("all");
+  const [fStatus, setFStatus] = useState("active");
+  const rows = data.assignments.filter((a) => {
+    if (internalOnly && !a.internal) return false;
+    if (fClient === "internal" && !a.internal) return false;
+    if (fClient !== "all" && fClient !== "internal" && a.clientId !== fClient) return false;
+    if (fLine !== "all" && a.serviceLine !== fLine) return false;
+    if (fStatus === "active" && a.status === "Done") return false;
+    if (fStatus !== "active" && fStatus !== "all" && a.status !== fStatus) return false;
+    return true;
+  });
+  return (
+    <>
+      {!internalOnly && <PageHead title="Assignments" sub="Filter by client or type of work. Assignments can be shared across people." action={<button className="cd-btn primary" onClick={() => setModal({ type: "assignment", payload: null })}><Plus size={16} />New assignment</button>} />}
+      {!internalOnly && <div className="cd-filters"><select value={fClient} onChange={(e) => setFClient(e.target.value)}><option value="all">All clients</option><option value="internal">Firm (internal)</option>{data.clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select><select value={fLine} onChange={(e) => setFLine(e.target.value)}><option value="all">All service lines</option>{SERVICE_LINES.map((x) => <option key={x} value={x}>{x}</option>)}</select><select value={fStatus} onChange={(e) => setFStatus(e.target.value)}><option value="active">Active</option><option value="all">All statuses</option>{STATUSES.map((x) => <option key={x} value={x}>{x}</option>)}</select></div>}
+      <div className="cd-alist">
+        {rows.length === 0 && <p className="cd-empty pad">No assignments match.</p>}
+        {rows.map((a) => { const r = (a.logged || 0) / (a.budget || 1); const od = daysUntil(a.due); const joint = (a.assigneeIds || []).length > 1; const ap = a.approval; return (
+          <div key={a.id} className={"cd-acard" + (a.confidential ? " conf" : "")}>
+            <div className="cd-acard-top"><div className="cd-acard-title">{a.confidential && <Lock size={13} className="cd-lock" />}{maskTitle(a, hideConf)}</div><StatusPill s={a.status} /></div>
+            <div className="cd-acard-meta">
+              <Tag tone={a.internal ? "plumlt" : "brandlt"}>{clientLabel(a)}</Tag><Tag>{a.serviceLine}</Tag>
+              <span className="cd-meta-who">{joint ? <UserPlus size={13} /> : <Users size={13} />}{whoNames(a, member)}</span>
+              <span className={"cd-meta-due" + (od != null && od < 0 && a.status !== "Done" ? " late" : "")}><Calendar size={13} />{fmtDate(a.due)}</span>
+              {(a.tasks || []).length > 0 && <span className="cd-tasks-chip"><Check size={12} />{a.tasks.filter((t) => t.done).length}/{a.tasks.length}</span>}
+              {a.reviewerId && <span className="cd-tasks-chip reviewer"><ShieldCheck size={12} />{member(a.reviewerId)?.name.split(" ")[0] || "Reviewer"}</span>}
+              {(a.links || []).length > 0 && <span className="cd-tasks-chip"><Link2 size={12} />{a.links.length}</span>}
+              {(a.comments || []).length > 0 && <span className="cd-tasks-chip"><AtSign size={12} />{a.comments.length}</span>}
+            </div>
+            {ap && <div className="cd-approval"><span className={"cd-pill " + (ap.status === "Approved" ? "ok" : "amber")}><ShieldCheck size={11} />{ap.status === "Approved" ? "Approved" : "Awaiting partner approval"}</span>{ap.status !== "Approved" && isAdmin && <button className="cd-btn ghost sm" onClick={() => approve(a.id)}>Approve</button>}</div>}
+            <div className="cd-acard-time"><div className="cd-time-bar"><Bar ratio={r} tone={r > 1 ? "alert" : "brand"} /></div><span className="cd-time-val">{a.logged || 0}/{a.budget || 0}h</span><div className="cd-acard-actions"><button className="cd-iconbtn" title="Log 1h" onClick={() => logTime(a.id, 1)}><Clock size={15} />+1h</button><button className="cd-iconbtn" onClick={() => setModal({ type: "assignment", payload: a })}><Pencil size={15} /></button></div></div>
+          </div>
+        ); })}
+      </div>
+    </>
+  );
+}
+
+/* ---------- Bandwidth ---------- */
+function Bandwidth({ data, load, hideConf, setModal, setCap, update, canSeeRate }) {
+  const [showSettings, setShowSettings] = useState(false);
+  const [skill, setSkill] = useState("all");
+  const amber = data.settings.amberThreshold;
+  const toggleStatus = (st) => { const cur = data.settings.countStatuses; update({ settings: { ...data.settings, countStatuses: cur.includes(st) ? cur.filter((x) => x !== st) : [...cur, st] } }); };
+  let team = [...data.team];
+  if (skill !== "all") team = team.filter((p) => (p.skills || []).includes(skill));
+  team.sort((a, b) => (load[a.id] || 0) / effectiveCap(a, data.availability) - (load[b.id] || 0) / effectiveCap(b, data.availability));
+  const sorted = skill === "all" ? [...team].sort((a, b) => (load[b.id] || 0) / effectiveCap(b, data.availability) - (load[a.id] || 0) / effectiveCap(a, data.availability)) : team;
+  return (
+    <>
+      <PageHead title="Team & bandwidth" sub="Monthly load versus capacity. PTO automatically lowers available hours." action={<div className="cd-head-actions"><button className="cd-btn ghost" onClick={() => setShowSettings((v) => !v)}><Settings size={15} />Customize</button><button className="cd-btn ghost" onClick={() => setModal({ type: "member", payload: null })}><Plus size={16} />Add person</button></div>} />
+      {showSettings && <div className="cd-card cd-settings">
+        <div className="cd-set-row"><div><div className="cd-set-label">Near-capacity threshold</div><div className="cd-set-hint">Bars turn amber here, alert above 100%.</div></div><div className="cd-set-slider"><input type="range" min="60" max="98" value={Math.round(amber * 100)} onChange={(e) => update({ settings: { ...data.settings, amberThreshold: Number(e.target.value) / 100 } })} /><b>{Math.round(amber * 100)}%</b></div></div>
+        <div className="cd-set-row"><div><div className="cd-set-label">Count toward load</div><div className="cd-set-hint">Which statuses add to monthly hours.</div></div><div className="cd-set-checks">{STATUSES.filter((x) => x !== "Done").map((st) => <label key={st} className={"cd-tagcheck" + (data.settings.countStatuses.includes(st) ? " on" : "")}><input type="checkbox" checked={data.settings.countStatuses.includes(st)} onChange={() => toggleStatus(st)} />{st}</label>)}</div></div>
+      </div>}
+      <div className="cd-band-bar"><div className="cd-band-legend"><span><i className="dot ok" />Has room</span><span><i className="dot amber" />Near capacity</span><span><i className="dot alert" />Over capacity</span></div><label className="cd-skillfilter"><Award size={14} />Skilled in <select value={skill} onChange={(e) => setSkill(e.target.value)}><option value="all">Anyone</option>{SKILLS.map((sk) => <option key={sk} value={sk}>{sk}</option>)}</select></label></div>
+      <div className="cd-band-list">
+        {sorted.length === 0 && <p className="cd-empty pad">No one with that skill yet.</p>}
+        {sorted.map((p) => { const cap = effectiveCap(p, data.availability); const out = outDaysThisMonth(p.id, data.availability); const used = load[p.id] || 0; const r = used / cap; const items = data.assignments.filter((a) => (a.assigneeIds || []).includes(p.id) && a.status !== "Done"); return (
+          <div key={p.id} className="cd-card cd-band-card">
+            <div className="cd-band-top">
+              <div><div className="cd-band-pname">{p.name}</div><div className="cd-band-prole">{p.role}{canSeeRate(p.id) && p.rate ? " · " + money(p.rate) + "/hr" : ""}{canSeeRate(p.id) && !p.rate ? <button className="cd-setrate" onClick={() => setModal({ type: "member", payload: p })}>+ Add rate</button> : null}</div></div>
+              <div className="cd-band-right"><div className="cd-band-edit-row"><button className="cd-iconbtn" title="Edit person" onClick={() => setModal({ type: "member", payload: p })}><Pencil size={14} /></button><div className={"cd-band-util " + utilColor(r, amber)}>{Math.round(r * 100)}%</div></div><label className="cd-cap-edit">cap <input type="number" min="1" value={p.capacity} onChange={(e) => setCap(p.id, Number(e.target.value) || 1)} />h/mo</label></div>
+            </div>
+            <Bar ratio={r} tone={utilColor(r, amber)} />
+            <div className="cd-band-sub">{Math.round(used)} of {cap}h committed{out > 0 && <span className="cd-pto">· PTO this month −{p.capacity - cap}h</span>}</div>
+            {(p.skills || []).length > 0 && <div className="cd-skilltags">{p.skills.map((sk) => <span key={sk} className={"cd-skilltag" + (sk === skill ? " on" : "")}>{sk}</span>)}</div>}
+            {r > 1 && <div className="cd-overflag"><AlertTriangle size={14} />Over by {Math.round(used - cap)}h — rebalance before adding work.</div>}
+            <div className="cd-band-items">{items.length === 0 && <span className="cd-empty">No active assignments.</span>}{items.map((a) => { const hrs = a.alloc?.[p.id] ?? (a.weekly / (a.assigneeIds.length || 1)); return <button key={a.id} className="cd-chip" onClick={() => setModal({ type: "assignment", payload: a })}>{a.confidential && <Lock size={11} className="cd-lock" />}{a.internal && <Megaphone size={11} />}{maskTitle(a, hideConf)} <b>{Math.round(hrs)}h</b></button>; })}</div>
+          </div>
+        ); })}
+      </div>
+    </>
+  );
+}
+
+/* ---------- Calendar ---------- */
+function CalendarView({ data, member, setModal, update }) {
+  const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
+  const [filter, setFilter] = useState("all");
+  const firmTz = data.settings.firmTimezone || "America/New_York";
+  const y = cursor.getFullYear(), mo = cursor.getMonth();
+  const startDow = new Date(y, mo, 1).getDay();
+  const gridStart = new Date(y, mo, 1 - startDow);
+  const cells = [...Array(42)].map((_, i) => new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i));
+  const monthLabel = cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const evMatch = (e) => filter === "all" || (e.memberIds || []).includes(filter);
+  const avMatch = (a) => filter === "all" || a.memberId === filter;
+  const move = (n) => setCursor(new Date(y, mo + n, 1));
+  const clientConversion = (e) => {
+    if (!e.clientId) return null;
+    const c = data.clients.find((x) => x.id === e.clientId);
+    if (!c || !c.timezone || c.timezone === firmTz) return null;
+    const conv = convertTime(e.date, e.time, firmTz, c.timezone);
+    if (!conv) return null;
+    return `${fmt12(conv.hhmm)} ${tzLabel(c.timezone).match(/\(([^)]+)\)/)?.[1] || c.timezone}${conv.dayShift !== 0 ? (conv.dayShift > 0 ? " (+1d)" : " (-1d)") : ""}`;
+  };
+  return (
+    <>
+      <PageHead title="Calendar" sub="One person or the whole team. Block availability and set events to repeat." action={<div className="cd-head-actions"><button className="cd-btn ghost" onClick={() => setModal({ type: "avail", payload: null })}><Ban size={15} />Block time</button><button className="cd-btn primary" onClick={() => setModal({ type: "event", payload: null })}><Plus size={16} />New event</button></div>} />
+      <div className="cd-cal-bar">
+        <div className="cd-cal-nav"><button className="cd-iconbtn" onClick={() => move(-1)}><ChevronLeft size={18} /></button><span className="cd-cal-month">{monthLabel}</span><button className="cd-iconbtn" onClick={() => move(1)}><ChevronRight size={18} /></button><button className="cd-btn ghost sm" onClick={() => setCursor(new Date(today.getFullYear(), today.getMonth(), 1))}>Today</button></div>
+        <div className="cd-cal-bar-right">
+          <label className="cd-tzpick"><Globe size={13} />Firm time zone <select value={firmTz} onChange={(e) => update({ settings: { ...data.settings, firmTimezone: e.target.value } })}>{TIMEZONES.map((z) => <option key={z.id} value={z.id}>{z.label}</option>)}</select></label>
+          <select className="cd-cal-filter" value={filter} onChange={(e) => setFilter(e.target.value)}><option value="all">Team (all)</option>{data.team.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
+        </div>
+      </div>
+      <div className="cd-cal-grid">
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => <div key={d} className="cd-cal-dow">{d}</div>)}
+        {cells.map((d, i) => { const iso = isoOf(d); const inMonth = d.getMonth() === mo; const isToday = iso === todayIso; const evs = data.events.filter((e) => e.date === iso && evMatch(e)); const avs = data.availability.filter((a) => a.start <= iso && a.end >= iso && avMatch(a)); return (
+          <div key={i} className={"cd-cal-cell" + (inMonth ? "" : " off") + (isToday ? " today" : "")} onClick={() => setModal({ type: "event", payload: { _date: iso } })}>
+            <div className="cd-cal-num">{d.getDate()}</div>
+            {avs.map((a) => <div key={a.id} className={"cd-cal-av " + a.type} onClick={(ev) => { ev.stopPropagation(); setModal({ type: "avail", payload: a }); }} title={member(a.memberId)?.name + " — " + a.note}>{a.type === "out" ? <Ban size={10} /> : <Clock size={10} />}{member(a.memberId)?.name.split(" ")[0]}: {a.note || (a.type === "out" ? "Out" : "Busy")}</div>)}
+            {evs.slice(0, 3).map((e) => { const conv = clientConversion(e); return <div key={e.id} className="cd-cal-ev" onClick={(ev) => { ev.stopPropagation(); setModal({ type: "event", payload: e }); }} title={e.title}><b>{fmt12(e.time)}</b> {e.title}{e.recurrence && e.recurrence !== "none" && <Repeat size={9} />}{conv && <span className="cd-cal-ev-tz">{conv} client</span>}</div>; })}
+            {evs.length > 3 && <div className="cd-cal-more">+{evs.length - 3} more</div>}
+          </div>
+        ); })}
+      </div>
+      <p className="cd-cal-foot">Click any day to add an event. Switch the dropdown to a person for their calendar, or “Team (all)” for the joint view. Times are shown in your firm time zone; client-zone conversions appear automatically when a client's zone differs.</p>
+    </>
+  );
+}
+
+/* ---------- Financials (admin) ---------- */
+function FinancialsLocked({ onUnlock }) {
+  return (
+    <>
+      <PageHead title="Financials" sub="Revenue, hours, and team pay." />
+      <div className="cd-locked-card">
+        <div className="cd-locked-ic"><Lock size={22} /></div>
+        <h2 className="cd-h2">Visible to admins only</h2>
+        <p>Financial data — rates, revenue, and pay — is restricted to platform admins. You're currently viewing as a team member.</p>
+        <button className="cd-btn primary" onClick={onUnlock}>Switch to Admin view</button>
+      </div>
+    </>
+  );
+}
+function Financials({ data, member, recordPayout, delPayout, setModal }) {
+  const active = data.assignments.filter((a) => !a.internal);
+  const totalRev = active.reduce((s, a) => s + revenueOf(a, member), 0);
+  const byGroup = (keyFn) => { const m = {}; active.forEach((a) => { const k = keyFn(a); m[k] = (m[k] || 0) + revenueOf(a, member); }); return Object.entries(m).sort((x, y) => y[1] - x[1]); };
+  const byClient = byGroup((a) => data.clients.find((c) => c.id === a.clientId)?.name || "—");
+  const byLine = byGroup((a) => a.serviceLine);
+  const maxC = Math.max(1, ...byClient.map(([, v]) => v)); const maxL = Math.max(1, ...byLine.map(([, v]) => v));
+  const hoursByClient = (() => { const m = {}; active.forEach((a) => { const k = data.clients.find((c) => c.id === a.clientId)?.name || "—"; m[k] = (m[k] || 0) + (a.logged || 0); }); return Object.entries(m).sort((x, y) => y[1] - x[1]); })();
+  const maxH = Math.max(1, ...hoursByClient.map(([, v]) => v));
+  const Stat = ({ n, label, tone }) => <div className="cd-stat"><div className={"cd-stat-n " + (tone || "")}>{n}</div><div className="cd-stat-l">{label}</div></div>;
+  return (
+    <>
+      <PageHead title="Financials" sub="Revenue, hours per client, and team pay. Visible to admins only." />
+      <div className="cd-stats"><Stat n={money(totalRev)} label="Total revenue logged" tone="ok" /><Stat n={data.team.length} label="Team members" /><Stat n={Math.round(active.reduce((s, a) => s + (a.logged || 0), 0))} label="Total client hours logged" /></div>
+      <div className="cd-grid2">
+        <section className="cd-card"><div className="cd-card-h"><h2 className="cd-h2">Revenue by client</h2></div>{byClient.map(([k, v]) => <div key={k} className="cd-fin-row"><div className="cd-fin-label">{k}</div><div className="cd-fin-bar"><div className="cd-fin-fill" style={{ width: (v / maxC * 100) + "%" }} /></div><div className="cd-fin-val">{money(v)}</div></div>)}</section>
+        <section className="cd-card"><div className="cd-card-h"><h2 className="cd-h2">Revenue by service line</h2></div>{byLine.map(([k, v]) => <div key={k} className="cd-fin-row"><div className="cd-fin-label">{k}</div><div className="cd-fin-bar"><div className="cd-fin-fill alt" style={{ width: (v / maxL * 100) + "%" }} /></div><div className="cd-fin-val">{money(v)}</div></div>)}</section>
+      </div>
+      <section className="cd-card"><div className="cd-card-h"><h2 className="cd-h2">Hours logged per client</h2></div>{hoursByClient.length === 0 && <p className="cd-empty">No hours logged yet.</p>}{hoursByClient.map(([k, v]) => <div key={k} className="cd-fin-row"><div className="cd-fin-label">{k}</div><div className="cd-fin-bar"><div className="cd-fin-fill hrs" style={{ width: (v / maxH * 100) + "%" }} /></div><div className="cd-fin-val">{Math.round(v)}h</div></div>)}</section>
+      <section className="cd-card">
+        <div className="cd-card-h"><h2 className="cd-h2"><Wallet size={15} className="cd-h2-ic" />Team pay</h2></div>
+        <p className="cd-cal-foot" style={{ marginTop: 0, marginBottom: 14 }}>Each person's hours (assignments + meetings) at their own rate. This is what they're owed — separate from what's billed to clients.</p>
+        {data.team.map((p) => <PayBreakdown key={p.id} memberId={p.id} data={data} recordPayout={recordPayout} delPayout={delPayout} showName onOpenAssignment={(a) => setModal({ type: "assignment", payload: a })} />)}
+      </section>
+    </>
+  );
+}
+function PayBreakdown({ memberId, data, recordPayout, delPayout, showName, onOpenAssignment }) {
+  const p = data.team.find((m) => m.id === memberId);
+  const b = memberPayBreakdown(memberId, data);
+  const myPayouts = data.payouts.filter((po) => po.memberId === memberId);
+  const [open, setOpen] = useState(false);
+  if (!p) return null;
+  return (
+    <div className="cd-pay-card">
+      <div className="cd-pay-top" onClick={() => setOpen((v) => !v)}>
+        {showName && <div className="cd-pay-name">{p.name}<span>{p.role}</span></div>}
+        <div className="cd-pay-figures">
+          <div><span>This month</span><b>{Math.round(b.hoursMonth)}h · {money(b.payMonth)}</b></div>
+          <div><span>All-time</span><b>{Math.round(b.hoursAll)}h · {money(b.payAll)}</b></div>
+        </div>
+        <ChevronRight size={16} className={"cd-pay-chev" + (open ? " open" : "")} />
+      </div>
+      {open && (
+        <div className="cd-pay-detail">
+          <div className="cd-pay-rate">Rate: {money(p.rate || 0)}/hr</div>
+          {b.items.length === 0 && <p className="cd-empty">No hours logged yet.</p>}
+          {b.items.map((it) => (
+            <div key={it.kind + it.id} className="cd-pay-item" onClick={it.kind === "assignment" ? () => onOpenAssignment(data.assignments.find((a) => a.id === it.id)) : undefined}>
+              <div className="cd-pay-item-ic">{it.kind === "event" ? <Calendar size={12} /> : <ClipboardList size={12} />}</div>
+              <div className="cd-pay-item-main"><div className="cd-pay-item-label">{it.label}</div><div className="cd-pay-item-sub">{it.sub}</div></div>
+              <div className="cd-pay-item-hrs">{Math.round(it.hoursAll)}h all-time</div>
+            </div>
+          ))}
+          <div className="cd-pay-actions">
+            <button className="cd-btn ghost sm" onClick={() => recordPayout(memberId, CURRENT_MONTH, b.hoursMonth, b.payMonth)}><Wallet size={13} />Record this month's payout</button>
+          </div>
+          {myPayouts.length > 0 && <div className="cd-payout-hist">
+            <div className="cd-payout-hist-label">Payout history</div>
+            {myPayouts.map((po) => <div key={po.id} className="cd-payout-row"><span>{po.period}</span><span>{Math.round(po.hours)}h</span><span>{money(po.amount)}</span><span className="cd-payout-date">paid {fmtDate(po.date)}</span><button className="cd-iconbtn danger" onClick={() => delPayout(po.id)}><X size={13} /></button></div>)}
+          </div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Marketing ---------- */
+function Marketing({ data, update, setModal, delChannel, ...rest }) {
+  return (
+    <>
+      <PageHead title="Marketing & brand" sub="Internal marketing, personal branding, and social work for the firm." action={<button className="cd-btn primary" onClick={() => setModal({ type: "assignment", payload: { internal: true } })}><Plus size={16} />New marketing task</button>} />
+      <div className="cd-grid2">
+        <section className="cd-card"><div className="cd-card-h"><h2 className="cd-h2">Firm presence</h2></div><label className="cd-inline-field"><span>Firm name</span><input value={data.firmName} onChange={(e) => update({ firmName: e.target.value })} /></label><label className="cd-inline-field"><span>Website</span><input value={data.website} onChange={(e) => update({ website: e.target.value })} /></label><a className="cd-btn ghost wide" href={data.website} target="_blank" rel="noreferrer"><Globe size={15} />Open website<ExternalLink size={13} /></a></section>
+        <section className="cd-card"><div className="cd-card-h"><h2 className="cd-h2">Social channels</h2><button className="cd-link" onClick={() => setModal({ type: "channel", payload: null })}><Plus size={14} />Add</button></div>{data.channels.length === 0 && <p className="cd-empty">No channels yet.</p>}{data.channels.map((c) => { const I = platIcon[c.platform] || Globe; return <div key={c.id} className="cd-chan-row"><div className={"cd-chan-ic " + c.platform.toLowerCase()}><I size={16} /></div><div className="cd-chan-main"><div className="cd-chan-handle">{c.handle}</div><div className="cd-chan-meta">{c.platform}{c.followers ? " · " + Number(c.followers).toLocaleString() + " followers" : ""}</div></div><a className="cd-iconbtn" href={c.url} target="_blank" rel="noreferrer"><ExternalLink size={15} /></a><button className="cd-iconbtn danger" onClick={() => delChannel(c.id)}><Trash2 size={15} /></button></div>; })}<p className="cd-chan-note">Links open the real profiles. Live analytics and post scheduling come with the connected version.</p></section>
+      </div>
+      <section><div className="cd-card-h" style={{ padding: "0 2px 4px" }}><h2 className="cd-h2">Marketing & brand work</h2></div><Assignments data={data} setModal={setModal} internalOnly {...rest} /></section>
+    </>
+  );
+}
+
+/* ---------- Clients ---------- */
+function Clients({ data, setModal }) {
+  return (
+    <>
+      <PageHead title="Clients" sub="Engagements, contracts, contacts, and renewals." action={<button className="cd-btn ghost" onClick={() => setModal({ type: "client", payload: null })}><Plus size={16} />Add client</button>} />
+      <div className="cd-client-grid">{data.clients.map((c) => { const open = data.assignments.filter((a) => a.clientId === c.id && a.status !== "Done"); const conf = open.some((a) => a.confidential); const ren = c.retainerRenewal ? daysUntil(c.retainerRenewal) : null; const allAsn = data.assignments.filter((a) => a.clientId === c.id); const allTimeHrs = allAsn.reduce((s, a) => s + (a.logged || 0), 0); const monthHrs = allAsn.reduce((s, a) => s + ((a.loggedByMonth || {})[CURRENT_MONTH] || 0), 0); const contracted = c.contractHours > 0; const ratio = contracted ? monthHrs / c.contractHours : 0; const over = contracted && monthHrs > c.contractHours; return (
+        <div key={c.id} className="cd-card cd-client-card" onClick={() => setModal({ type: "client", payload: c })}>
+          <div className="cd-client-name">{c.name}{conf && <Lock size={13} className="cd-lock" />}</div>
+          <div className="cd-client-count">{open.length} open engagement{open.length === 1 ? "" : "s"}</div>
+          {contracted ? (
+            <div className="cd-contract-block">
+              <Bar ratio={ratio} tone={over ? "alert" : utilColor(ratio, 0.85)} />
+              <div className={"cd-contract-line" + (over ? " over" : "")}>{Math.round(monthHrs)} / {c.contractHours}h contracted this month{c.contractRate ? ` · ${money(c.contractRate)}/mo` : ""}</div>
+              {over && <div className="cd-contract-over"><AlertTriangle size={12} />{Math.round(monthHrs - c.contractHours)}h over contract this month</div>}
+            </div>
+          ) : null}
+          <div className="cd-client-hours">{Math.round(allTimeHrs)}h logged all-time{!contracted ? ` · ${Math.round(monthHrs)}h this month` : ""}</div>
+          {c.contacts && c.contacts[0] && <div className="cd-client-contact">{c.contacts[0].name} · {c.contacts[0].role}</div>}
+          {ren != null && <div className={"cd-client-renew" + (ren <= 30 ? " soon" : "")}>Renews {fmtDate(c.retainerRenewal)}{ren <= 30 ? ` (${ren}d)` : ""}</div>}
+          <div className="cd-client-lines">{[...new Set(open.map((a) => a.serviceLine))].slice(0, 4).map((sl) => <Tag key={sl}>{sl}</Tag>)}</div>
+        </div>
+      ); })}</div>
+    </>
+  );
+}
+
+/* ---------- Templates ---------- */
+function Templates({ data, setModal }) {
+  return (
+    <>
+      <PageHead title="Templates" sub="Spin up a standard engagement with its tasks and budgeted hours." />
+      <div className="cd-tpl-grid">{data.templates.map((t) => { const total = t.tasks.reduce((sum, [, h]) => sum + h, 0); return (
+        <div key={t.id} className="cd-card cd-tpl-card"><div className="cd-tpl-head"><div><div className="cd-tpl-name">{t.name}{t.confidential && <Lock size={12} className="cd-lock" />}{t.internal && <Megaphone size={12} />}</div><div className="cd-tpl-line">{t.serviceLine}</div></div><div className="cd-tpl-hrs">{total}h</div></div><ul className="cd-tpl-tasks">{t.tasks.map(([label, h], i) => <li key={i}><Check size={13} />{label}<span>{h}h</span></li>)}</ul><button className="cd-btn primary wide" onClick={() => setModal({ type: "launch", payload: t })}><Plus size={15} />Start engagement</button></div>
+      ); })}</div>
+    </>
+  );
+}
+
+/* ---------- Tour ---------- */
+function Tour({ i, setTour, isAdmin }) {
+  const steps = TOUR.filter((s) => s.view !== "financials" || isAdmin);
+  const step = steps[Math.min(i, steps.length - 1)];
+  const [playing, setPlaying] = useState(true);
+  useEffect(() => { if (!playing) return; const t = setTimeout(() => { if (i < steps.length - 1) setTour(i + 1); else setTour(-1); }, 4400); return () => clearTimeout(t); }, [i, playing]);
+  useEffect(() => { if (step) {/* view set by parent via TOUR; map */ } }, [i]);
+  // sync parent view to filtered step
+  useEffect(() => { /* parent listens to tour index against TOUR; ensure same order */ }, []);
+  return (
+    <div className="cd-tour">
+      <div className="cd-tour-top"><span className="cd-tour-badge">Tour · {i + 1}/{steps.length}</span><button className="cd-iconbtn" onClick={() => setTour(-1)}><X size={16} /></button></div>
+      <div className="cd-tour-title">{step.title}</div>
+      <div className="cd-tour-body">{step.body}</div>
+      <div className="cd-tour-dots">{steps.map((_, k) => <i key={k} className={k === i ? "on" : ""} />)}</div>
+      <div className="cd-tour-ctrl"><button className="cd-btn ghost sm" disabled={i === 0} onClick={() => setTour(i - 1)}><ArrowLeft size={14} />Back</button><button className="cd-iconbtn" onClick={() => setPlaying((v) => !v)}>{playing ? <Pause size={15} /> : <Play size={15} />}</button>{i < steps.length - 1 ? <button className="cd-btn primary sm" onClick={() => setTour(i + 1)}>Next<ArrowRight size={14} /></button> : <button className="cd-btn primary sm" onClick={() => setTour(-1)}>Finish</button>}</div>
+    </div>
+  );
+}
+
+/* ---------- Modals ---------- */
+function Modals({ modal, data, member, canSeeRate, currentUser, postComment, notifyReviewer, saveAssignment, delAssignment, saveEvent, delEvent, saveAvail, delAvail, saveClient, saveMember, saveChannel, importData, resetFresh, restoreSample, setModal }) {
+  const close = () => setModal(null);
+  const hasId = modal.payload && modal.payload.id;
+  return (
+    <div className="cd-overlay" onClick={close}><div className="cd-modal" onClick={(e) => e.stopPropagation()}>
+      {modal.type === "assignment" && <AssignmentForm a={hasId ? modal.payload : null} preset={modal.payload} data={data} currentUser={currentUser} postComment={postComment} notifyReviewer={notifyReviewer} onSave={(a) => { saveAssignment(a); close(); }} onDelete={hasId ? () => { delAssignment(modal.payload.id); close(); } : null} onClose={close} />}
+      {modal.type === "event" && <EventForm e={hasId ? modal.payload : null} preDate={modal.payload && modal.payload._date} data={data} onSave={(e) => { saveEvent(e); close(); }} onDelete={hasId ? () => { delEvent(modal.payload.id); close(); } : null} onClose={close} />}
+      {modal.type === "avail" && <AvailForm a={modal.payload} data={data} onSave={(a) => { saveAvail(a); close(); }} onDelete={modal.payload ? () => { delAvail(modal.payload.id); close(); } : null} onClose={close} />}
+      {modal.type === "channel" && <ChannelForm onSave={(c) => { saveChannel(c); close(); }} onClose={close} />}
+      {modal.type === "client" && <ClientForm c={modal.payload} onSave={(c) => { saveClient(c); close(); }} onClose={close} />}
+      {modal.type === "member" && <MemberForm m={modal.payload} canSeeRate={canSeeRate} onSave={(m) => { saveMember(m); close(); }} onClose={close} />}
+      {modal.type === "launch" && <LaunchForm t={modal.payload} data={data} onSave={(a) => { saveAssignment(a); close(); }} onClose={close} />}
+      {modal.type === "data" && <DataModal data={data} onImport={importData} onResetFresh={resetFresh} onRestore={restoreSample} onClose={close} />}
+      {modal.type === "mypay" && <MyPayModal memberId={modal.payload} data={data} onClose={close} />}
+    </div></div>
+  );
+}
+function MyPayModal({ memberId, data, onClose }) {
+  const p = data.team.find((m) => m.id === memberId);
+  const b = memberPayBreakdown(memberId, data);
+  const myPayouts = data.payouts.filter((po) => po.memberId === memberId);
+  if (!p) return null;
+  return (
+    <>
+      <ModalHead title="My pay" onClose={onClose} />
+      <div className="cd-form">
+        <p className="cd-launch-note">Your rate is {money(p.rate || 0)}/hr — visible only to you and admins. Hours come from assignments (your share of logged hours) and meetings you're tagged on.</p>
+        <div className="cd-mypay-stats">
+          <div className="cd-mypay-stat"><span>This month</span><b>{Math.round(b.hoursMonth)}h</b><i>{money(b.payMonth)}</i></div>
+          <div className="cd-mypay-stat"><span>All-time</span><b>{Math.round(b.hoursAll)}h</b><i>{money(b.payAll)}</i></div>
+        </div>
+        <div className="cd-flabel" style={{ marginTop: 4 }}>Breakdown</div>
+        {b.items.length === 0 && <p className="cd-empty">No hours logged yet.</p>}
+        {b.items.map((it) => (
+          <div key={it.kind + it.id} className="cd-pay-item">
+            <div className="cd-pay-item-ic">{it.kind === "event" ? <Calendar size={12} /> : <ClipboardList size={12} />}</div>
+            <div className="cd-pay-item-main"><div className="cd-pay-item-label">{it.label}</div><div className="cd-pay-item-sub">{it.sub}</div></div>
+            <div className="cd-pay-item-hrs">{Math.round(it.hoursAll)}h all-time</div>
+          </div>
+        ))}
+        {myPayouts.length > 0 && <div className="cd-payout-hist">
+          <div className="cd-payout-hist-label">Payout history</div>
+          {myPayouts.map((po) => <div key={po.id} className="cd-payout-row"><span>{po.period}</span><span>{Math.round(po.hours)}h</span><span>{money(po.amount)}</span><span className="cd-payout-date">paid {fmtDate(po.date)}</span></div>)}
+        </div>}
+      </div>
+      <div className="cd-modal-foot"><div className="cd-foot-right"><button className="cd-btn primary" onClick={onClose}>Done</button></div></div>
+    </>
+  );
+}
+function ModalHead({ title, onClose }) { return <div className="cd-modal-h"><h2 className="cd-h2">{title}</h2><button className="cd-iconbtn" onClick={onClose}><X size={18} /></button></div>; }
+function Field({ label, children, hint }) { return <label className="cd-field"><span className="cd-flabel">{label}</span>{children}{hint && <span className="cd-fhint">{hint}</span>}</label>; }
+
+function AssignmentForm({ a, preset, data, currentUser, postComment, notifyReviewer, onSave, onDelete, onClose }) {
+  const init = a || { id: uid(), title: "", clientId: preset?.internal ? null : (data.clients[0]?.id || ""), internal: !!preset?.internal, serviceLine: preset?.internal ? "Social Media" : SERVICE_LINES[0], assigneeIds: [], alloc: {}, status: "Not started", due: dayOffset(7), budget: 20, logged: 0, confidential: false, billable: "unset", approval: null, tasks: [], reviewerId: null, comments: [], links: [], loggedByMonth: {}, notes: "" };
+  const [f, setF] = useState(init);
+  const [commentText, setCommentText] = useState("");
+  const [commentTags, setCommentTags] = useState([]);
+  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
+  const toggle = (id) => setF((s) => { const on = s.assigneeIds.includes(id); const ids = on ? s.assigneeIds.filter((x) => x !== id) : [...s.assigneeIds, id]; const alloc = { ...s.alloc }; if (on) delete alloc[id]; else alloc[id] = alloc[id] ?? 4; return { ...s, assigneeIds: ids, alloc }; });
+  const setAlloc = (id, v) => setF((s) => ({ ...s, alloc: { ...s.alloc, [id]: v } }));
+  const addTask = () => setF((s) => ({ ...s, tasks: [...(s.tasks || []), { id: uid(), label: "", done: false, assigneeId: null }] }));
+  const setTaskLabel = (id, v) => setF((s) => ({ ...s, tasks: (s.tasks || []).map((t) => (t.id === id ? { ...t, label: v } : t)) }));
+  const setTaskAssignee = (id, mid) => setF((s) => ({ ...s, tasks: (s.tasks || []).map((t) => (t.id === id ? { ...t, assigneeId: mid || null } : t)) }));
+  const toggleTask = (id) => setF((s) => ({ ...s, tasks: (s.tasks || []).map((t) => (t.id === id ? { ...t, done: !t.done } : t)) }));
+  const delTask = (id) => setF((s) => ({ ...s, tasks: (s.tasks || []).filter((t) => t.id !== id) }));
+  const addLink = () => setF((s) => ({ ...s, links: [...(s.links || []), { id: uid(), label: "", url: "" }] }));
+  const setLink = (id, k, v) => setF((s) => ({ ...s, links: (s.links || []).map((l) => (l.id === id ? { ...l, [k]: v } : l)) }));
+  const delLink = (id) => setF((s) => ({ ...s, links: (s.links || []).filter((l) => l.id !== id) }));
+  const weekly = f.assigneeIds.reduce((s, id) => s + (Number(f.alloc[id]) || 0), 0);
+  const reqApproval = !!f.approval;
+  const toggleApproval = (on) => set("approval", on ? (f.approval || { status: "Pending" }) : null);
+  const save = () => onSave({ ...f, clientId: f.internal ? null : f.clientId, weekly });
+  const authorId = currentUser?.role === "admin" ? null : currentUser?.memberId;
+  const authorLabel = currentUser?.role === "admin" ? "Admin" : (data.team.find((m) => m.id === currentUser?.memberId)?.name || "Someone");
+  const toggleCommentTag = (id) => setCommentTags((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const postNow = () => {
+    const comment = { id: uid(), authorId, authorLabel, text: commentText.trim(), mentions: commentTags, date: new Date().toISOString() };
+    postComment(f.id, comment);
+    setF((s) => ({ ...s, comments: [...(s.comments || []), comment] }));
+    setCommentText(""); setCommentTags([]);
+  };
+  const saveAndNotify = () => { onSave({ ...f, clientId: f.internal ? null : f.clientId, weekly }); notifyReviewer(f.id, f.reviewerId, f.title); };
+  return (
+    <>
+      <ModalHead title={a ? "Edit assignment" : f.internal ? "New marketing task" : "New assignment"} onClose={onClose} />
+      <div className="cd-form">
+        <Field label="Title"><input value={f.title} onChange={(e) => set("title", e.target.value)} placeholder="e.g. Handbook audit & revision" autoFocus /></Field>
+        <label className="cd-check sub"><input type="checkbox" checked={f.internal} onChange={(e) => set("internal", e.target.checked)} /><Megaphone size={14} />Internal firm work (marketing, branding, social)</label>
+        <div className="cd-form-row">{!f.internal && <Field label="Client"><select value={f.clientId || ""} onChange={(e) => set("clientId", e.target.value)}>{data.clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>}<Field label="Service line"><select value={f.serviceLine} onChange={(e) => set("serviceLine", e.target.value)}>{SERVICE_LINES.map((x) => <option key={x} value={x}>{x}</option>)}</select></Field><Field label="Status"><select value={f.status} onChange={(e) => set("status", e.target.value)}>{STATUSES.map((x) => <option key={x} value={x}>{x}</option>)}</select></Field></div>
+        <Field label="Assigned to" hint={f.assigneeIds.length > 1 ? `Joint — ${weekly}h/month total across ${f.assigneeIds.length} people` : "Pick one or more; set each person's monthly hours"}><div className="cd-people">{data.team.map((m) => { const on = f.assigneeIds.includes(m.id); return <div key={m.id} className={"cd-person" + (on ? " on" : "")}><label><input type="checkbox" checked={on} onChange={() => toggle(m.id)} />{m.name}</label>{on && <span className="cd-person-hrs"><input type="number" min="0" value={f.alloc[m.id] ?? 0} onChange={(e) => setAlloc(m.id, Number(e.target.value))} />h/mo</span>}</div>; })}</div></Field>
+        <Field label="Reviewer (optional)" hint="Save & notify pushes them a review request">
+          <div className="cd-reviewer-row">
+            <select value={f.reviewerId || ""} onChange={(e) => set("reviewerId", e.target.value || null)}><option value="">No reviewer</option>{data.team.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
+            <button type="button" className="cd-btn ghost sm" disabled={!f.reviewerId} onClick={saveAndNotify}><Bell size={13} />Save &amp; notify</button>
+          </div>
+        </Field>
+        <Field label="Due date"><input type="date" value={f.due} onChange={(e) => set("due", e.target.value)} /></Field>
+        <div className="cd-form-row"><Field label="Budgeted hours"><input type="number" min="0" value={f.budget} onChange={(e) => set("budget", Number(e.target.value))} /></Field><Field label="Logged hours"><input type="number" min="0" value={f.logged} onChange={(e) => set("logged", Number(e.target.value))} /></Field></div>
+        <Field label="Notes"><textarea value={f.notes} onChange={(e) => set("notes", e.target.value)} rows={2} /></Field>
+        <Field label="Links" hint="Docs, Google Drive folders, decks, etc.">
+          <div className="cd-contacts">
+            {(f.links || []).length === 0 && <p className="cd-empty">No links yet.</p>}
+            {(f.links || []).map((l) => <div key={l.id} className="cd-link-row"><input placeholder="Label (e.g. Handbook draft)" value={l.label} onChange={(e) => setLink(l.id, "label", e.target.value)} /><input placeholder="https://drive.google.com/…" value={l.url} onChange={(e) => setLink(l.id, "url", e.target.value)} />{l.url && <a className="cd-iconbtn" href={l.url} target="_blank" rel="noreferrer"><ExternalLink size={14} /></a>}<button type="button" className="cd-iconbtn danger" onClick={() => delLink(l.id)}><X size={14} /></button></div>)}
+            <button type="button" className="cd-link cd-addstep" onClick={addLink}><Plus size={13} />Add link</button>
+          </div>
+        </Field>
+        <Field label="Checklist" hint="Break the engagement into steps, optionally assigned to someone">
+          <div className="cd-checklist">
+            {(f.tasks || []).map((t) => <div key={t.id} className="cd-cl-row"><input type="checkbox" checked={t.done} onChange={() => toggleTask(t.id)} /><input className={"cd-cl-text" + (t.done ? " done" : "")} value={t.label} onChange={(e) => setTaskLabel(t.id, e.target.value)} placeholder="Task step" /><select className="cd-cl-assignee" value={t.assigneeId || ""} onChange={(e) => setTaskAssignee(t.id, e.target.value)}><option value="">Unassigned</option>{data.team.map((m) => <option key={m.id} value={m.id}>{m.name.split(" ")[0]}</option>)}</select><button type="button" className="cd-iconbtn danger" onClick={() => delTask(t.id)}><X size={14} /></button></div>)}
+            <button type="button" className="cd-link cd-addstep" onClick={addTask}><Plus size={13} />Add step</button>
+          </div>
+        </Field>
+        {a && <Field label="Activity & tags" hint="Tag a teammate to notify them">
+          <div className="cd-activity">
+            {(f.comments || []).length === 0 && <p className="cd-empty">No activity yet.</p>}
+            {(f.comments || []).slice().reverse().map((c) => <div key={c.id} className="cd-comment"><div className="cd-comment-meta"><b>{c.authorLabel}</b><span>{new Date(c.date).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span></div><div className="cd-comment-text">{c.text}</div>{c.mentions && c.mentions.length > 0 && <div className="cd-comment-tags"><AtSign size={11} />Tagged: {c.mentions.map((mid) => data.team.find((m) => m.id === mid)?.name.split(" ")[0]).filter(Boolean).join(", ")}</div>}</div>)}
+            <div className="cd-comment-compose">
+              <div className="cd-people compact">{data.team.map((m) => <label key={m.id} className={"cd-tagcheck" + (commentTags.includes(m.id) ? " on" : "")}><input type="checkbox" checked={commentTags.includes(m.id)} onChange={() => toggleCommentTag(m.id)} />{m.name.split(" ")[0]}</label>)}</div>
+              <div className="cd-comment-input"><input value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="Add a note, tag teammates…" /><button type="button" className="cd-btn primary sm" disabled={!commentText.trim()} onClick={postNow}>Post</button></div>
+            </div>
+          </div>
+        </Field>}
+        <label className="cd-check alt"><input type="checkbox" checked={reqApproval} onChange={(e) => toggleApproval(e.target.checked)} /><ShieldCheck size={14} />Requires partner approval (use as needed)</label>
+        <label className="cd-check"><input type="checkbox" checked={f.confidential} onChange={(e) => set("confidential", e.target.checked)} /><Lock size={14} className="cd-lock" />Confidential — restrict and mark as sensitive</label>
+      </div>
+      <div className="cd-modal-foot">{onDelete && <button className="cd-btn danger" onClick={onDelete}><Trash2 size={15} />Delete</button>}<div className="cd-foot-right"><button className="cd-btn ghost" onClick={onClose}>Cancel</button><button className="cd-btn primary" disabled={!f.title.trim()} onClick={save}>Save</button></div></div>
+    </>
+  );
+}
+
+function EventForm({ e, preDate, data, onSave, onDelete, onClose }) {
+  const [f, setF] = useState(e || { id: uid(), title: "", type: EVENT_TYPES[0], clientId: "", date: preDate || dayOffset(3), time: "10:00", durationHours: 1, memberIds: [], attendees: "", recurrence: "none" });
+  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
+  const toggle = (id) => setF((s) => ({ ...s, memberIds: s.memberIds.includes(id) ? s.memberIds.filter((x) => x !== id) : [...s.memberIds, id] }));
+  const nextDate = () => { const d = new Date(f.date + "T00:00:00"); if (f.recurrence === "weekly") d.setDate(d.getDate() + 7); else if (f.recurrence === "monthly") d.setMonth(d.getMonth() + 1); else return; onSave({ ...f, id: uid(), date: isoOf(d) }); };
+  const firmTz = data.settings.firmTimezone || "America/New_York";
+  const client = data.clients.find((c) => c.id === f.clientId);
+  const conv = client && client.timezone && client.timezone !== firmTz ? convertTime(f.date, f.time, firmTz, client.timezone) : null;
+  return (
+    <>
+      <ModalHead title={e ? "Edit event" : "New event"} onClose={onClose} />
+      <div className="cd-form">
+        <Field label="Title"><input value={f.title} onChange={(ev) => set("title", ev.target.value)} placeholder="e.g. Ask HR — June session" autoFocus /></Field>
+        <div className="cd-form-row"><Field label="Type"><select value={f.type} onChange={(ev) => set("type", ev.target.value)}>{EVENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</select></Field><Field label="Client"><select value={f.clientId} onChange={(ev) => set("clientId", ev.target.value)}><option value="">Firm (internal)</option>{data.clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field></div>
+        <div className="cd-form-row"><Field label="Date"><input type="date" value={f.date} onChange={(ev) => set("date", ev.target.value)} /></Field><Field label="Time" hint={fmt12(f.time)}><input type="time" value={f.time} onChange={(ev) => set("time", ev.target.value)} /></Field><Field label="Duration (h)" hint="Counts toward pay"><input type="number" min="0" step="0.25" value={f.durationHours} onChange={(ev) => set("durationHours", Number(ev.target.value))} /></Field></div>
+        {conv && <div className="cd-tz-preview"><Globe size={13} />Client local time: <b>{fmt12(conv.hhmm)} {tzLabel(client.timezone).match(/\(([^)]+)\)/)?.[1] || client.timezone}</b>{conv.dayShift !== 0 ? (conv.dayShift > 0 ? " (next day)" : " (previous day)") : ""}</div>}
+        <Field label="Repeats"><select value={f.recurrence} onChange={(ev) => set("recurrence", ev.target.value)}><option value="none">Does not repeat</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></Field>
+        <Field label="Team on this" hint="Shows on each person's calendar and counts toward their pay"><div className="cd-people compact">{data.team.map((m) => <label key={m.id} className={"cd-tagcheck" + (f.memberIds.includes(m.id) ? " on" : "")}><input type="checkbox" checked={f.memberIds.includes(m.id)} onChange={() => toggle(m.id)} />{m.name.split(" ")[0]}</label>)}</div></Field>
+        <Field label="Other attendees"><input value={f.attendees} onChange={(ev) => set("attendees", ev.target.value)} placeholder="e.g. client HR team" /></Field>
+        {f.recurrence !== "none" && <button className="cd-btn ghost wide" onClick={nextDate} type="button"><Repeat size={14} />Generate next occurrence</button>}
+      </div>
+      <div className="cd-modal-foot">{onDelete && <button className="cd-btn danger" onClick={onDelete}><Trash2 size={15} />Delete</button>}<div className="cd-foot-right"><button className="cd-btn ghost" onClick={onClose}>Cancel</button><button className="cd-btn primary" disabled={!f.title.trim()} onClick={() => onSave(f)}>Save</button></div></div>
+    </>
+  );
+}
+
+function AvailForm({ a, data, onSave, onDelete, onClose }) {
+  const [f, setF] = useState(a || { id: uid(), memberId: data.team[0]?.id || "", type: "out", start: dayOffset(1), end: dayOffset(1), note: "" });
+  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
+  return (
+    <>
+      <ModalHead title={a ? "Edit availability" : "Block time"} onClose={onClose} />
+      <div className="cd-form">
+        <div className="cd-form-row"><Field label="Person"><select value={f.memberId} onChange={(e) => set("memberId", e.target.value)}>{data.team.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></Field><Field label="Type" hint="“Out” lowers their weekly capacity"><select value={f.type} onChange={(e) => set("type", e.target.value)}><option value="out">Out (PTO / unavailable)</option><option value="busy">Busy (no new work)</option></select></Field></div>
+        <div className="cd-form-row"><Field label="From"><input type="date" value={f.start} onChange={(e) => set("start", e.target.value)} /></Field><Field label="To"><input type="date" value={f.end} min={f.start} onChange={(e) => set("end", e.target.value)} /></Field></div>
+        <Field label="Note"><input value={f.note} onChange={(e) => set("note", e.target.value)} placeholder="e.g. Vacation, conference" /></Field>
+      </div>
+      <div className="cd-modal-foot">{onDelete && <button className="cd-btn danger" onClick={onDelete}><Trash2 size={15} />Remove</button>}<div className="cd-foot-right"><button className="cd-btn ghost" onClick={onClose}>Cancel</button><button className="cd-btn primary" onClick={() => onSave({ ...f, end: f.end < f.start ? f.start : f.end })}>Save</button></div></div>
+    </>
+  );
+}
+
+function ChannelForm({ onSave, onClose }) {
+  const [f, setF] = useState({ id: uid(), platform: "LinkedIn", handle: "", url: "", followers: "" });
+  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
+  return (<><ModalHead title="Add channel" onClose={onClose} /><div className="cd-form"><div className="cd-form-row"><Field label="Platform"><select value={f.platform} onChange={(e) => set("platform", e.target.value)}>{PLATFORMS.map((p) => <option key={p} value={p}>{p}</option>)}</select></Field><Field label="Followers (optional)"><input type="number" min="0" value={f.followers} onChange={(e) => set("followers", e.target.value)} /></Field></div><Field label="Handle / name"><input value={f.handle} onChange={(e) => set("handle", e.target.value)} placeholder="@yourfirm" autoFocus /></Field><Field label="Profile URL"><input value={f.url} onChange={(e) => set("url", e.target.value)} placeholder="https://..." /></Field></div><div className="cd-modal-foot"><div className="cd-foot-right"><button className="cd-btn ghost" onClick={onClose}>Cancel</button><button className="cd-btn primary" disabled={!f.handle.trim()} onClick={() => onSave({ ...f, followers: Number(f.followers) || 0 })}>Add</button></div></div></>);
+}
+
+function ClientForm({ c, onSave, onClose }) {
+  const [f, setF] = useState(c || { id: uid(), name: "", retainerRenewal: "", contractHours: "", contractRate: "", timezone: "America/New_York", contacts: [] });
+  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
+  const addContact = () => set("contacts", [...(f.contacts || []), { name: "", role: "", email: "" }]);
+  const setContact = (i, k, v) => set("contacts", f.contacts.map((ct, j) => (j === i ? { ...ct, [k]: v } : ct)));
+  const delContact = (i) => set("contacts", f.contacts.filter((_, j) => j !== i));
+  return (
+    <>
+      <ModalHead title={c ? "Edit client" : "Add client"} onClose={onClose} />
+      <div className="cd-form">
+        <div className="cd-form-row"><Field label="Client name"><input value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. Northbridge Manufacturing" autoFocus /></Field><Field label="Retainer renewal" hint="Optional"><input type="date" value={f.retainerRenewal || ""} onChange={(e) => set("retainerRenewal", e.target.value)} /></Field></div>
+        <Field label="Contract (optional)" hint="From the signed agreement, e.g. $9,500 for 40 hours/month">
+          <div className="cd-form-row">
+            <input type="number" min="0" placeholder="Monthly agreed hours" value={f.contractHours ?? ""} onChange={(e) => set("contractHours", e.target.value === "" ? null : Number(e.target.value))} />
+            <input type="number" min="0" placeholder="Monthly contract rate ($)" value={f.contractRate ?? ""} onChange={(e) => set("contractRate", e.target.value === "" ? null : Number(e.target.value))} />
+            <select value={f.timezone || "America/New_York"} onChange={(e) => set("timezone", e.target.value)}>{TIMEZONES.map((z) => <option key={z.id} value={z.id}>{z.label}</option>)}</select>
+          </div>
+        </Field>
+        <div className="cd-contacts"><div className="cd-contacts-h"><span className="cd-flabel">Contacts</span><button className="cd-link" type="button" onClick={addContact}><Plus size={13} />Add contact</button></div>{(f.contacts || []).length === 0 && <p className="cd-empty">No contacts yet.</p>}{(f.contacts || []).map((ct, i) => <div key={i} className="cd-contact-row"><input placeholder="Name" value={ct.name} onChange={(e) => setContact(i, "name", e.target.value)} /><input placeholder="Role" value={ct.role} onChange={(e) => setContact(i, "role", e.target.value)} /><input placeholder="Email" value={ct.email} onChange={(e) => setContact(i, "email", e.target.value)} /><button className="cd-iconbtn danger" type="button" onClick={() => delContact(i)}><X size={14} /></button></div>)}</div>
+      </div>
+      <div className="cd-modal-foot"><div className="cd-foot-right"><button className="cd-btn ghost" onClick={onClose}>Cancel</button><button className="cd-btn primary" disabled={!f.name.trim()} onClick={() => onSave({ ...f, retainerRenewal: f.retainerRenewal || null })}>Save</button></div></div>
+    </>
+  );
+}
+
+function MemberForm({ m, canSeeRate, onSave, onClose }) {
+  const [f, setF] = useState(m || { id: uid(), name: "", role: "HR Consultant", capacity: 30, rate: 0, skills: [] });
+  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
+  const toggleSkill = (sk) => set("skills", (f.skills || []).includes(sk) ? f.skills.filter((x) => x !== sk) : [...(f.skills || []), sk]);
+  const showRate = canSeeRate ? canSeeRate(f.id) : true;
+  return (
+    <>
+      <ModalHead title={m ? "Edit person" : "Add person"} onClose={onClose} />
+      <div className="cd-form">
+        <Field label="Name"><input value={f.name} onChange={(e) => set("name", e.target.value)} autoFocus /></Field>
+        <div className="cd-form-row">
+          <Field label="Role"><input value={f.role} onChange={(e) => set("role", e.target.value)} /></Field>
+          <Field label="Monthly capacity (h)"><input type="number" min="0" value={f.capacity} onChange={(e) => set("capacity", Number(e.target.value))} /></Field>
+          {showRate
+            ? <Field label="Billing rate ($/hr)" hint="Private to this person & admins"><input type="number" min="0" value={f.rate || 0} onChange={(e) => set("rate", Number(e.target.value))} /></Field>
+            : <Field label="Billing rate"><div className="cd-ratehidden"><Lock size={12} />Private to them &amp; admins</div></Field>}
+        </div>
+        <Field label="Skills"><div className="cd-people compact">{SKILLS.map((sk) => <label key={sk} className={"cd-tagcheck" + ((f.skills || []).includes(sk) ? " on" : "")}><input type="checkbox" checked={(f.skills || []).includes(sk)} onChange={() => toggleSkill(sk)} />{sk}</label>)}</div></Field>
+      </div>
+      <div className="cd-modal-foot"><div className="cd-foot-right"><button className="cd-btn ghost" onClick={onClose}>Cancel</button><button className="cd-btn primary" disabled={!f.name.trim()} onClick={() => onSave(f)}>{m ? "Save" : "Add"}</button></div></div>
+    </>
+  );
+}
+
+function LaunchForm({ t, data, onSave, onClose }) {
+  const total = t.tasks.reduce((s, [, h]) => s + h, 0);
+  const [f, setF] = useState({ clientId: t.internal ? null : (data.clients[0]?.id || ""), assigneeId: "", due: dayOffset(21) });
+  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
+  const launch = () => { const ids = f.assigneeId ? [f.assigneeId] : []; const monthly = Math.max(6, Math.round(total / 1.5)); const alloc = {}; ids.forEach((id) => (alloc[id] = monthly)); onSave({ id: uid(), title: t.name + " engagement", clientId: t.internal ? null : f.clientId, internal: !!t.internal, serviceLine: t.serviceLine, assigneeIds: ids, alloc, weekly: ids.length ? monthly : 0, status: "Not started", due: f.due, budget: total, logged: 0, confidential: !!t.confidential, billable: t.internal ? "nonbillable" : "unset", approval: null, reviewerId: null, comments: [], links: [], loggedByMonth: {}, tasks: t.tasks.map(([l]) => ({ id: uid(), label: l, done: false, assigneeId: null })), notes: "" }); };
+  return (
+    <>
+      <ModalHead title={"Start: " + t.name} onClose={onClose} />
+      <div className="cd-form"><p className="cd-launch-note">Creates a {t.internal ? "marketing " : ""}engagement for <b>{t.serviceLine}</b>, budgeted at <b>{total}h</b> across {t.tasks.length} standard tasks{t.confidential ? ", marked confidential" : ""}.</p><div className="cd-form-row">{!t.internal && <Field label="Client"><select value={f.clientId || ""} onChange={(e) => set("clientId", e.target.value)}>{data.clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>}<Field label="Lead"><select value={f.assigneeId} onChange={(e) => set("assigneeId", e.target.value)}><option value="">Unassigned</option>{data.team.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></Field></div><Field label="Target due date"><input type="date" value={f.due} onChange={(e) => set("due", e.target.value)} /></Field></div>
+      <div className="cd-modal-foot"><div className="cd-foot-right"><button className="cd-btn ghost" onClick={onClose}>Cancel</button><button className="cd-btn primary" onClick={launch}>Create engagement</button></div></div>
+    </>
+  );
+}
+
+function DataModal({ data, onImport, onResetFresh, onRestore, onClose }) {
+  const [status, setStatus] = useState(null);
+  const [confirming, setConfirming] = useState(null);
+  const fileRef = React.useRef(null);
+  const exportNow = () => {
+    try {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url; a.download = `cadence-backup-${todayIso}.json`;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setStatus({ ok: true, msg: "Backup downloaded. If nothing downloaded, open Cadence in its own browser tab." });
+    } catch (e) { setStatus({ ok: false, msg: "Couldn't export here — open Cadence in its own browser tab and try again." }); }
+  };
+  const onFile = (e) => {
+    const file = e.target.files && e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { try { const obj = JSON.parse(reader.result); if (!obj || !Array.isArray(obj.assignments)) throw new Error("bad"); onImport(obj); setStatus({ ok: true, msg: "Backup loaded successfully." }); } catch (err) { setStatus({ ok: false, msg: "That file isn't a valid Cadence backup." }); } };
+    reader.onerror = () => setStatus({ ok: false, msg: "Couldn't read that file." });
+    reader.readAsText(file); e.target.value = "";
+  };
+  return (
+    <>
+      <ModalHead title="Data & backup" onClose={onClose} />
+      <div className="cd-form">
+        <p className="cd-data-note">This prototype keeps your data in <b>this browser only</b>. Export a backup regularly — and always before clearing your cache or switching devices.</p>
+        <div className="cd-data-actions">
+          <button className="cd-data-btn" onClick={exportNow}><Download size={16} /><div><b>Export backup</b><span>Download everything as a .json file</span></div></button>
+          <button className="cd-data-btn" onClick={() => fileRef.current && fileRef.current.click()}><Upload size={16} /><div><b>Import backup</b><span>Restore from a .json file</span></div></button>
+          <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: "none" }} onChange={onFile} />
+          <button className="cd-data-btn warn" onClick={() => setConfirming({ msg: "Clear all clients, assignments, events, availability, channels, notifications, and payout history? Your team, templates, and firm setup are kept.", run: () => { onResetFresh(); setStatus({ ok: true, msg: "Started fresh — your team and templates were kept." }); } })}><RotateCcw size={16} /><div><b>Start fresh</b><span>Clear records, keep your setup</span></div></button>
+          <button className="cd-data-btn" onClick={() => setConfirming({ msg: "Replace everything with the sample demo data?", run: () => { onRestore(); setStatus({ ok: true, msg: "Sample data restored." }); } })}><Sparkles size={16} /><div><b>Restore sample data</b><span>Reload the demo content</span></div></button>
+        </div>
+        {confirming && <div className="cd-confirm"><span>{confirming.msg}</span><div className="cd-confirm-btns"><button className="cd-btn ghost sm" onClick={() => setConfirming(null)}>Cancel</button><button className="cd-btn danger sm" onClick={() => { confirming.run(); setConfirming(null); }}>Yes, continue</button></div></div>}
+        {status && <div className={"cd-data-status " + (status.ok ? "ok" : "err")}>{status.msg}</div>}
+      </div>
+      <div className="cd-modal-foot"><div className="cd-foot-right"><button className="cd-btn primary" onClick={onClose}>Done</button></div></div>
+    </>
+  );
+}
+
+/* ---------------- styles ---------------- */
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&display=swap');
+.cd-root *{box-sizing:border-box;margin:0;}
+.cd-root{--paper:#F2F5F1;--surface:#FFFFFF;--border:#E3E8E1;--ink:#1A2823;--muted:#69736D;--brand:#236B57;--brand-d:#19503F;--brand-lt:#E5F0EB;--amber:#B5811F;--amber-lt:#F7EED9;--alert:#AB452B;--alert-lt:#F6E2DA;--plum:#6A4E73;--plum-lt:#ECE4EF;--ok:#2E7D5B;display:flex;min-height:100vh;background:var(--paper);color:var(--ink);font-family:'Inter',system-ui,sans-serif;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;}
+.cd-side{width:230px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 14px;position:sticky;top:0;height:100vh;}
+.cd-brand{padding:6px 8px 18px;}
+.cd-logo{display:block;font-family:'Fraunces',serif;font-size:24px;font-weight:600;letter-spacing:-.5px;color:var(--brand-d);}
+.cd-firm{display:block;font-size:11px;color:var(--muted);margin-top:2px;line-height:1.3;}
+.cd-nav{display:flex;flex-direction:column;gap:2px;flex:1;}
+.cd-navbtn{display:flex;align-items:center;gap:11px;padding:9px 11px;border:none;background:none;border-radius:9px;color:var(--muted);font-size:13.5px;font-weight:500;cursor:pointer;text-align:left;font-family:inherit;transition:background .12s,color .12s;}
+.cd-navbtn:hover{background:#F4F7F3;color:var(--ink);}
+.cd-navbtn.on{background:var(--brand-lt);color:var(--brand-d);}
+.cd-side-foot{display:flex;flex-direction:column;gap:7px;}
+.cd-roleswitch{font-family:inherit;font-size:12px;color:var(--ink);border:1px solid var(--border);border-radius:9px;padding:8px 10px;background:#FAFBFA;cursor:pointer;font-weight:500;}
+.cd-conf-toggle,.cd-tour-btn{display:flex;align-items:center;gap:8px;padding:8px 11px;border:1px solid var(--border);background:none;border-radius:9px;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;}
+.cd-conf-toggle:hover{border-color:var(--plum);color:var(--plum);}
+.cd-tour-btn{border-color:var(--brand-lt);color:var(--brand-d);background:var(--brand-lt);}
+.cd-profile-btn{display:flex;align-items:center;gap:8px;padding:8px 11px;border:1px solid var(--brand-lt);background:#FFF;border-radius:9px;color:var(--brand-d);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;}
+.cd-profile-btn:hover{background:var(--brand-lt);}
+.cd-bell-btn{position:relative;}
+.cd-bell-badge{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--alert);color:#fff;font-size:10.5px;font-weight:700;margin-left:auto;}
+.cd-notif-panel{position:fixed;left:16px;bottom:86px;width:340px;max-width:calc(100vw - 32px);max-height:60vh;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 18px 50px rgba(26,40,35,.22);z-index:55;display:flex;flex-direction:column;overflow:hidden;}
+.cd-notif-head{display:flex;justify-content:space-between;align-items:center;padding:13px 15px;border-bottom:1px solid var(--border);font-size:13.5px;font-weight:600;}
+.cd-notif-list{overflow-y:auto;padding:6px;}
+.cd-notif-row{display:flex;gap:10px;align-items:flex-start;padding:9px 9px;border-radius:9px;cursor:pointer;}
+.cd-notif-row:hover{background:#F4F7F3;}
+.cd-notif-row.unread{background:var(--brand-lt);}
+.cd-notif-row.unread:hover{filter:brightness(.98);}
+.cd-notif-ic{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#EEF1ED;color:#52605A;}
+.cd-notif-ic.review{background:var(--amber-lt);color:var(--amber);}
+.cd-notif-ic.mention{background:var(--brand-lt);color:var(--brand-d);}
+.cd-notif-to{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+.cd-notif-text{font-size:12.5px;line-height:1.4;}
+.cd-notif-date{font-size:10.5px;color:var(--muted);margin-top:2px;}
+.cd-navbtn.locked{color:#A9B3AD;}
+.cd-navlock{margin-left:auto;color:#B9C2BC;}
+.cd-locked-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:38px 28px;text-align:center;max-width:460px;margin:20px auto;}
+.cd-locked-ic{width:52px;height:52px;border-radius:50%;background:var(--plum-lt);color:var(--plum);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;}
+.cd-locked-card h2{margin-bottom:0;}
+.cd-locked-card p{font-size:13px;color:var(--muted);margin:8px 0 18px;line-height:1.55;}
+.cd-main{flex:1;min-width:0;padding:30px 36px 50px;max-width:1200px;}
+.cd-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:22px;}
+.cd-head-actions{display:flex;gap:9px;}
+.cd-h1{font-family:'Fraunces',serif;font-size:27px;font-weight:500;letter-spacing:-.4px;}
+.cd-sub{color:var(--muted);font-size:13.5px;margin-top:3px;}
+.cd-h2{font-size:14.5px;font-weight:600;letter-spacing:-.1px;}
+.cd-btn{display:inline-flex;align-items:center;gap:7px;padding:8px 14px;border-radius:9px;font-size:13px;font-weight:550;cursor:pointer;border:1px solid transparent;font-family:inherit;transition:filter .12s,background .12s;white-space:nowrap;text-decoration:none;}
+.cd-btn.sm{padding:5px 10px;font-size:12px;}
+.cd-btn.primary{background:var(--brand);color:#fff;}
+.cd-btn.primary:hover{filter:brightness(1.08);}
+.cd-btn.primary:disabled{opacity:.45;cursor:not-allowed;filter:none;}
+.cd-btn.ghost{background:var(--surface);border-color:var(--border);color:var(--ink);}
+.cd-btn.ghost:hover{background:#F4F7F3;}
+.cd-btn.ghost:disabled{opacity:.4;cursor:not-allowed;}
+.cd-btn.danger{background:var(--alert-lt);color:var(--alert);}
+.cd-btn.wide{width:100%;justify-content:center;}
+.cd-link{display:inline-flex;align-items:center;gap:3px;background:none;border:none;color:var(--brand);font-size:12.5px;font-weight:550;cursor:pointer;font-family:inherit;}
+.cd-iconbtn{display:inline-flex;align-items:center;gap:3px;padding:5px 7px;border:none;background:none;border-radius:7px;color:var(--muted);cursor:pointer;font-size:12px;font-weight:550;font-family:inherit;text-decoration:none;}
+.cd-iconbtn:hover{background:#F1F4F0;color:var(--ink);}
+.cd-iconbtn.danger:hover{background:var(--alert-lt);color:var(--alert);}
+.cd-alerts{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
+.cd-alertchip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:550;padding:6px 11px;border-radius:8px;cursor:default;}
+.cd-alertchip.renew{background:var(--brand-lt);color:var(--brand-d);}
+.cd-alertchip.approve{background:var(--amber-lt);color:var(--amber);cursor:pointer;}
+.cd-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px;}
+.cd-stat{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:16px 18px;}
+.cd-stat-n{font-size:30px;font-weight:600;font-family:'Fraunces',serif;letter-spacing:-.5px;line-height:1;}
+.cd-stat-n.amber{color:var(--amber);}.cd-stat-n.alert{color:var(--alert);}.cd-stat-n.ok{color:var(--ok);}.cd-stat-n.plum{color:var(--plum);}
+.cd-stat-l{font-size:12px;color:var(--muted);margin-top:7px;}
+.cd-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:16px;}
+.cd-card-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px;}
+.cd-grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.cd-empty{color:var(--muted);font-size:13px;font-style:italic;}
+.cd-empty.pad{padding:20px;}
+.cd-band-row{display:grid;grid-template-columns:54px 1fr auto;align-items:center;gap:12px;padding:5px 0;}
+.cd-band-name{font-size:13px;font-weight:500;}
+.cd-band-val{font-size:12px;font-weight:600;text-align:right;color:var(--ok);white-space:nowrap;}
+.cd-band-val.amber{color:var(--amber);}.cd-band-val.alert{color:var(--alert);}
+.cd-bar{height:8px;background:#EDF0EC;border-radius:5px;overflow:hidden;}
+.cd-bar-fill{height:100%;border-radius:5px;transition:width .3s ease;}
+.cd-bar-fill.ok,.cd-bar-fill.brand{background:var(--brand);}.cd-bar-fill.amber{background:var(--amber);}.cd-bar-fill.alert{background:var(--alert);}
+.cd-up-row{display:flex;gap:13px;padding:8px 0;border-top:1px solid #EFF2EE;}
+.cd-up-row:first-of-type{border-top:none;}
+.cd-up-date{font-size:12px;font-weight:600;color:var(--brand-d);min-width:52px;}
+.cd-up-date span{display:block;font-weight:400;color:var(--muted);}
+.cd-up-title{font-size:13px;font-weight:500;display:flex;align-items:center;gap:5px;}
+.cd-rep{color:var(--muted);}
+.cd-up-meta{font-size:11.5px;color:var(--muted);}
+.cd-due-row{display:grid;grid-template-columns:46px 1fr auto auto;align-items:center;gap:12px;padding:9px 0;border-top:1px solid #EFF2EE;cursor:pointer;}
+.cd-due-row:hover{background:#F8FAF7;border-radius:8px;}
+.cd-due-when{font-size:12px;font-weight:600;color:var(--amber);}
+.cd-due-title{font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;}
+.cd-due-who{font-size:12px;color:var(--muted);}
+.cd-tag{display:inline-block;font-size:11px;font-weight:550;padding:3px 8px;border-radius:6px;background:#EEF1ED;color:#52605A;white-space:nowrap;}
+.cd-tag.brandlt{background:var(--brand-lt);color:var(--brand-d);}
+.cd-tag.plumlt{background:var(--plum-lt);color:var(--plum);}
+.cd-flag{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;padding:3px 8px;border-radius:6px;}
+.cd-pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:550;padding:3px 9px;border-radius:20px;}
+.cd-pill.neutral{background:#EEF1ED;color:#52605A;}.cd-pill.brand{background:var(--brand-lt);color:var(--brand-d);}.cd-pill.amber{background:var(--amber-lt);color:var(--amber);}.cd-pill.alert{background:var(--alert-lt);color:var(--alert);}.cd-pill.ok{background:#E2F0E8;color:var(--ok);}
+.cd-pill.sendback{background:#F3E2D9;color:#A8552B;}
+.cd-lock{color:var(--plum);flex-shrink:0;}
+.cd-filters{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+.cd-filters select,.cd-form select,.cd-form input,.cd-form textarea,.cd-cal-filter,.cd-skillfilter select{font-family:inherit;font-size:13px;color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:var(--surface);}
+.cd-filters select,.cd-cal-filter{cursor:pointer;}
+select:focus,input:focus,textarea:focus{outline:2px solid var(--brand-lt);border-color:var(--brand);}
+.cd-alist{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.cd-acard{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:15px 17px;}
+.cd-acard.conf{border-left:3px solid var(--plum);}
+.cd-acard-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px;}
+.cd-acard-title{font-size:14px;font-weight:600;display:flex;align-items:center;gap:6px;}
+.cd-acard-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.cd-meta-who,.cd-meta-due{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);}
+.cd-meta-due.late{color:var(--alert);font-weight:550;}
+.cd-approval{display:flex;align-items:center;gap:9px;margin-bottom:11px;}
+.cd-acard-time{display:flex;align-items:center;gap:10px;}
+.cd-time-bar{flex:1;}
+.cd-time-val{font-size:11.5px;color:var(--muted);white-space:nowrap;}
+.cd-acard-actions{display:flex;gap:2px;}
+.cd-settings{padding:6px 20px;}
+.cd-set-row{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:13px 0;border-bottom:1px solid #EFF2EE;}
+.cd-set-row:last-child{border-bottom:none;}
+.cd-set-label{font-size:13px;font-weight:600;}
+.cd-set-hint{font-size:11.5px;color:var(--muted);margin-top:1px;}
+.cd-set-slider{display:flex;align-items:center;gap:10px;}
+.cd-set-slider input{accent-color:var(--brand);width:150px;}
+.cd-set-slider b{color:var(--brand-d);min-width:36px;}
+.cd-set-checks{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;}
+.cd-tagcheck{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:5px 9px;border:1px solid var(--border);border-radius:7px;cursor:pointer;color:var(--muted);}
+.cd-tagcheck.on{background:var(--brand-lt);border-color:var(--brand);color:var(--brand-d);}
+.cd-tagcheck input{display:none;}
+.cd-band-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
+.cd-band-legend{display:flex;gap:18px;font-size:12px;color:var(--muted);}
+.cd-band-legend .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle;}
+.dot.ok{background:var(--brand);}.dot.amber{background:var(--amber);}.dot.alert{background:var(--alert);}
+.cd-skillfilter{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);}
+.cd-skillfilter select{padding:5px 8px;}
+.cd-band-list{display:flex;flex-direction:column;gap:13px;}
+.cd-band-card{margin-bottom:0;}
+.cd-band-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:11px;}
+.cd-band-pname{font-size:15px;font-weight:600;}
+.cd-band-prole{font-size:12px;color:var(--muted);}
+.cd-band-right{text-align:right;}
+.cd-band-util{font-size:20px;font-weight:600;font-family:'Fraunces',serif;color:var(--ok);line-height:1.1;}
+.cd-band-util.amber{color:var(--amber);}.cd-band-util.alert{color:var(--alert);}
+.cd-cap-edit{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);justify-content:flex-end;margin-top:3px;}
+.cd-cap-edit input{width:42px;padding:2px 5px;border:1px solid var(--border);border-radius:5px;font-family:inherit;font-size:11px;text-align:center;}
+.cd-band-edit-row{display:flex;align-items:center;gap:6px;justify-content:flex-end;}
+.cd-setrate{display:inline-block;margin-left:6px;background:none;border:none;color:var(--brand);font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer;padding:0;}
+.cd-ratehidden{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);padding:8px 10px;background:#F2F5F1;border-radius:8px;}
+.cd-band-sub{font-size:11.5px;color:var(--muted);margin-top:6px;}
+.cd-pto{color:var(--plum);font-weight:550;margin-left:4px;}
+.cd-skilltags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;}
+.cd-skilltag{font-size:10.5px;font-weight:550;padding:2px 7px;border-radius:5px;background:#EEF1ED;color:#52605A;}
+.cd-skilltag.on{background:var(--brand-lt);color:var(--brand-d);}
+.cd-overflag{display:flex;align-items:center;gap:7px;margin-top:10px;font-size:12px;font-weight:550;color:var(--alert);background:var(--alert-lt);padding:7px 11px;border-radius:8px;}
+.cd-band-items{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px;}
+.cd-chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;background:#F1F4F0;border:1px solid var(--border);border-radius:7px;padding:4px 9px;cursor:pointer;font-family:inherit;color:var(--ink);}
+.cd-chip:hover{background:var(--brand-lt);border-color:var(--brand);}
+.cd-chip b{color:var(--brand-d);}
+.cd-fin-row{display:grid;grid-template-columns:130px 1fr 78px;align-items:center;gap:11px;padding:6px 0;}
+.cd-fin-label{font-size:12.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cd-fin-bar{height:18px;background:#EDF0EC;border-radius:5px;overflow:hidden;}
+.cd-fin-fill{height:100%;background:var(--brand);border-radius:5px;}
+.cd-fin-fill.alt{background:var(--plum);}
+.cd-fin-fill.hrs{background:var(--amber);}
+.cd-fin-val{font-size:12.5px;font-weight:600;text-align:right;color:var(--brand-d);}
+.cd-h2-ic{margin-right:6px;vertical-align:-2px;color:var(--brand-d);}
+.cd-pay-card{border:1px solid var(--border);border-radius:11px;margin-bottom:9px;overflow:hidden;}
+.cd-pay-top{display:flex;align-items:center;gap:14px;padding:12px 14px;cursor:pointer;}
+.cd-pay-top:hover{background:#F8FAF7;}
+.cd-pay-name{font-size:13.5px;font-weight:600;min-width:140px;}
+.cd-pay-name span{display:block;font-size:11px;font-weight:400;color:var(--muted);}
+.cd-pay-figures{display:flex;gap:22px;flex:1;}
+.cd-pay-figures div{font-size:11px;color:var(--muted);}
+.cd-pay-figures b{display:block;font-size:13px;color:var(--brand-d);font-weight:700;}
+.cd-pay-chev{color:var(--muted);transition:transform .15s;flex-shrink:0;}
+.cd-pay-chev.open{transform:rotate(90deg);}
+.cd-pay-detail{padding:4px 14px 14px;border-top:1px solid #EFF2EE;}
+.cd-pay-rate{font-size:11.5px;color:var(--muted);margin:8px 0 6px;}
+.cd-pay-item{display:flex;align-items:center;gap:9px;padding:7px 0;border-top:1px solid #F2F5F1;cursor:pointer;}
+.cd-pay-item:first-of-type{border-top:none;}
+.cd-pay-item-ic{width:22px;height:22px;border-radius:50%;background:#EEF1ED;color:#52605A;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.cd-pay-item-label{font-size:12.5px;font-weight:550;}
+.cd-pay-item-sub{font-size:11px;color:var(--muted);}
+.cd-pay-item-main{flex:1;min-width:0;}
+.cd-pay-item-hrs{font-size:11.5px;color:var(--muted);white-space:nowrap;}
+.cd-pay-actions{margin-top:10px;}
+.cd-payout-hist{margin-top:12px;border-top:1px solid #EFF2EE;padding-top:9px;}
+.cd-payout-hist-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin-bottom:6px;}
+.cd-payout-row{display:grid;grid-template-columns:60px 50px 70px 1fr auto;align-items:center;gap:8px;font-size:11.5px;color:#41504A;padding:4px 0;}
+.cd-payout-date{color:var(--muted);}
+.cd-mypay-stats{display:flex;gap:12px;}
+.cd-mypay-stat{flex:1;background:var(--brand-lt);border-radius:10px;padding:12px 14px;}
+.cd-mypay-stat span{display:block;font-size:11px;color:var(--brand-d);}
+.cd-mypay-stat b{display:block;font-size:19px;font-family:'Fraunces',serif;color:var(--brand-d);}
+.cd-mypay-stat i{font-style:normal;font-size:12px;color:var(--brand-d);}
+.cd-contract-block{margin:6px 0 4px;}
+.cd-contract-line{font-size:11px;color:var(--muted);margin-top:4px;}
+.cd-contract-line.over{color:var(--alert);font-weight:600;}
+.cd-contract-over{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--alert);margin-top:3px;}
+.cd-tzpick{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);}
+.cd-tzpick select{padding:6px 8px;font-size:12px;}
+.cd-cal-bar-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.cd-cal-ev-tz{display:block;font-size:9px;color:var(--muted);}
+.cd-tz-preview{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--brand-d);background:var(--brand-lt);padding:9px 12px;border-radius:9px;}
+.cd-client-hours{font-size:11.5px;color:var(--muted);margin:2px 0;}
+.cd-reviewer-row{display:flex;align-items:center;gap:9px;}
+.cd-reviewer-row select{flex:1;}
+.cd-link-row{display:grid;grid-template-columns:1fr 1.4fr auto auto;gap:6px;margin-bottom:6px;align-items:center;}
+.cd-link-row input{padding:6px 8px;font-size:12px;}
+.cd-cl-assignee{width:auto;flex-shrink:0;padding:5px 7px;font-size:11.5px;border-radius:6px;}
+.cd-activity{border:1px solid var(--border);border-radius:9px;padding:11px;display:flex;flex-direction:column;gap:9px;}
+.cd-comment{border-bottom:1px solid #F0F3EF;padding-bottom:8px;}
+.cd-comment-meta{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-bottom:2px;}
+.cd-comment-meta b{color:var(--ink);font-weight:600;}
+.cd-comment-text{font-size:12.5px;line-height:1.45;}
+.cd-comment-tags{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--brand-d);margin-top:3px;}
+.cd-comment-compose{display:flex;flex-direction:column;gap:7px;padding-top:4px;}
+.cd-comment-input{display:flex;gap:7px;}
+.cd-comment-input input{flex:1;}
+.cd-cal-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
+.cd-cal-nav{display:flex;align-items:center;gap:8px;}
+.cd-cal-month{font-family:'Fraunces',serif;font-size:18px;font-weight:500;min-width:160px;text-align:center;}
+.cd-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.cd-cal-dow{background:#F7F9F6;padding:8px 6px;font-size:11px;font-weight:600;color:var(--muted);text-align:center;text-transform:uppercase;letter-spacing:.5px;}
+.cd-cal-cell{background:var(--surface);min-height:96px;padding:5px 6px;cursor:pointer;display:flex;flex-direction:column;gap:3px;}
+.cd-cal-cell:hover{background:#FAFCF9;}
+.cd-cal-cell.off{background:#FAFBFA;}
+.cd-cal-cell.off .cd-cal-num{color:#B9C2BC;}
+.cd-cal-cell.today{box-shadow:inset 0 0 0 2px var(--brand);}
+.cd-cal-num{font-size:12px;font-weight:600;}
+.cd-cal-ev{font-size:10.5px;background:var(--brand-lt);color:var(--brand-d);border-radius:5px;padding:2px 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;display:flex;align-items:center;gap:3px;}
+.cd-cal-av{display:flex;align-items:center;gap:3px;font-size:10px;border-radius:5px;padding:2px 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;}
+.cd-cal-av.out{background:var(--plum-lt);color:var(--plum);}
+.cd-cal-av.busy{background:var(--amber-lt);color:var(--amber);}
+.cd-cal-more{font-size:10px;color:var(--muted);padding-left:3px;}
+.cd-cal-foot,.cd-chan-note{font-size:11.5px;color:var(--muted);margin-top:10px;font-style:italic;}
+.cd-inline-field{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:12.5px;color:#41504A;}
+.cd-inline-field span{min-width:78px;font-weight:600;}
+.cd-inline-field input{flex:1;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-family:inherit;font-size:13px;}
+.cd-chan-row{display:flex;align-items:center;gap:11px;padding:9px 0;border-top:1px solid #EFF2EE;}
+.cd-chan-row:first-of-type{border-top:none;}
+.cd-chan-ic{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:var(--brand-lt);color:var(--brand-d);flex-shrink:0;}
+.cd-chan-ic.linkedin{background:#E7F0F7;color:#0A66C2;}.cd-chan-ic.instagram{background:#FBE9F0;color:#C13584;}.cd-chan-ic.x{background:#ECEEF0;color:#111;}.cd-chan-ic.facebook{background:#E7EEFB;color:#1877F2;}.cd-chan-ic.youtube{background:#FBE5E5;color:#C4302B;}
+.cd-chan-handle{font-size:13px;font-weight:600;}
+.cd-chan-meta{font-size:11.5px;color:var(--muted);}
+.cd-chan-main{flex:1;min-width:0;}
+.cd-chan-note{margin-top:12px;}
+.cd-client-grid,.cd-tpl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;}
+.cd-client-card{margin-bottom:0;cursor:pointer;}
+.cd-client-card:hover{border-color:var(--brand);}
+.cd-client-name{font-size:15px;font-weight:600;display:flex;align-items:center;gap:7px;}
+.cd-client-count{font-size:12.5px;color:var(--muted);margin:4px 0 2px;}
+.cd-client-contact{font-size:11.5px;color:var(--muted);}
+.cd-client-renew{font-size:11.5px;color:var(--muted);margin-top:5px;}
+.cd-client-renew.soon{color:var(--amber);font-weight:600;}
+.cd-client-lines{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;}
+.cd-tpl-card{margin-bottom:0;display:flex;flex-direction:column;}
+.cd-tpl-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
+.cd-tpl-name{font-size:15px;font-weight:600;display:flex;align-items:center;gap:6px;}
+.cd-tpl-line{font-size:12px;color:var(--muted);}
+.cd-tpl-hrs{font-family:'Fraunces',serif;font-size:18px;font-weight:600;color:var(--brand-d);}
+.cd-tpl-tasks{list-style:none;margin-bottom:14px;flex:1;}
+.cd-tpl-tasks li{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:4px 0;color:#41504A;border-bottom:1px solid #F2F5F1;}
+.cd-tpl-tasks li svg{color:var(--brand);flex-shrink:0;}
+.cd-tpl-tasks li span{margin-left:auto;color:var(--muted);font-size:11.5px;}
+.cd-overlay{position:fixed;inset:0;background:rgba(26,40,35,.42);display:flex;align-items:flex-start;justify-content:center;padding:40px 18px;z-index:50;overflow-y:auto;backdrop-filter:blur(2px);}
+.cd-modal{background:var(--surface);border-radius:16px;width:100%;max-width:580px;box-shadow:0 24px 60px rgba(26,40,35,.25);overflow:hidden;}
+.cd-modal-h{display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid var(--border);}
+.cd-form{padding:20px 22px;display:flex;flex-direction:column;gap:14px;max-height:66vh;overflow-y:auto;}
+.cd-form-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.cd-form-row:has(.cd-field:only-child){grid-template-columns:1fr;}
+.cd-field{display:flex;flex-direction:column;gap:5px;}
+.cd-flabel{font-size:12px;font-weight:600;color:#41504A;}
+.cd-fhint{font-size:10.5px;color:var(--muted);}
+.cd-form input,.cd-form select,.cd-form textarea{width:100%;}
+.cd-form textarea{resize:vertical;}
+.cd-people{display:flex;flex-direction:column;gap:4px;border:1px solid var(--border);border-radius:9px;padding:8px;}
+.cd-people.compact{flex-direction:row;flex-wrap:wrap;border:none;padding:0;}
+.cd-person{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 6px;border-radius:7px;font-size:13px;}
+.cd-person.on{background:var(--brand-lt);}
+.cd-person label{display:flex;align-items:center;gap:8px;cursor:pointer;}
+.cd-person input[type=checkbox]{accent-color:var(--brand);}
+.cd-person-hrs{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--brand-d);}
+.cd-person-hrs input{width:48px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;font-size:12px;text-align:center;}
+.cd-check{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#41504A;cursor:pointer;padding:9px 11px;background:var(--plum-lt);border-radius:9px;}
+.cd-check.sub{background:#F2F5F1;}
+.cd-check.alt{background:var(--amber-lt);}
+.cd-check input{width:auto;accent-color:var(--plum);}
+.cd-contacts{border:1px solid var(--border);border-radius:9px;padding:11px;}
+.cd-contacts-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.cd-contact-row{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:6px;margin-bottom:6px;}
+.cd-contact-row input{padding:6px 8px;font-size:12px;}
+.cd-launch-note{font-size:13px;color:#41504A;background:var(--brand-lt);padding:11px 13px;border-radius:9px;}
+.cd-tasks-chip{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;padding:3px 8px;border-radius:6px;background:#EEF1ED;color:#52605A;}
+.cd-tasks-chip svg{color:var(--brand);}
+.cd-tasks-chip.reviewer{background:var(--amber-lt);color:var(--amber);}
+.cd-tasks-chip.reviewer svg{color:var(--amber);}
+.cd-checklist{display:flex;flex-direction:column;gap:6px;border:1px solid var(--border);border-radius:9px;padding:9px;}
+.cd-cl-row{display:flex;align-items:center;gap:8px;}
+.cd-cl-row input[type=checkbox]{accent-color:var(--brand);flex-shrink:0;}
+.cd-cl-text{flex:1;border:1px solid var(--border);border-radius:7px;padding:6px 9px;font-size:13px;font-family:inherit;}
+.cd-cl-text.done{text-decoration:line-through;color:var(--muted);}
+.cd-addstep{align-self:flex-start;padding:2px 0;}
+.cd-data-note{font-size:13px;color:#41504A;background:var(--amber-lt);padding:11px 13px;border-radius:9px;line-height:1.5;}
+.cd-data-actions{display:flex;flex-direction:column;gap:8px;}
+.cd-data-btn{display:flex;align-items:center;gap:12px;text-align:left;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);cursor:pointer;font-family:inherit;color:var(--ink);}
+.cd-data-btn:hover{background:#F4F7F3;border-color:var(--brand);}
+.cd-data-btn svg{color:var(--brand-d);flex-shrink:0;}
+.cd-data-btn b{display:block;font-size:13px;font-weight:600;}
+.cd-data-btn span{display:block;font-size:11.5px;color:var(--muted);}
+.cd-data-btn.warn svg{color:var(--alert);}
+.cd-data-btn.warn:hover{border-color:var(--alert);}
+.cd-confirm{background:var(--alert-lt);border-radius:9px;padding:11px 13px;font-size:12.5px;color:var(--alert);display:flex;flex-direction:column;gap:9px;}
+.cd-confirm-btns{display:flex;gap:8px;justify-content:flex-end;}
+.cd-data-status{font-size:12.5px;padding:9px 12px;border-radius:8px;}
+.cd-data-status.ok{background:#E2F0E8;color:var(--ok);}
+.cd-data-status.err{background:var(--alert-lt);color:var(--alert);}
+.cd-modal-foot{display:flex;justify-content:space-between;align-items:center;padding:15px 22px;border-top:1px solid var(--border);background:#FBFCFA;}
+.cd-foot-right{display:flex;gap:9px;margin-left:auto;}
+.cd-foot{font-size:11.5px;color:var(--muted);margin-top:26px;padding-top:16px;border-top:1px solid var(--border);line-height:1.5;}
+.cd-tour{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);width:380px;max-width:calc(100vw - 32px);background:var(--ink);color:#fff;border-radius:14px;padding:16px 18px;z-index:60;box-shadow:0 18px 50px rgba(0,0,0,.3);}
+.cd-tour-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.cd-tour-top .cd-iconbtn{color:#9FB0A8;}
+.cd-tour-badge{font-size:11px;font-weight:600;color:#8FE3C4;letter-spacing:.4px;text-transform:uppercase;}
+.cd-tour-title{font-family:'Fraunces',serif;font-size:18px;font-weight:500;margin-bottom:4px;}
+.cd-tour-body{font-size:13px;color:#CDD7D2;line-height:1.5;margin-bottom:12px;}
+.cd-tour-dots{display:flex;gap:5px;margin-bottom:12px;}
+.cd-tour-dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.25);}
+.cd-tour-dots i.on{background:#8FE3C4;}
+.cd-tour-ctrl{display:flex;align-items:center;gap:8px;}
+.cd-tour-ctrl .cd-iconbtn{color:#CDD7D2;margin:0 auto 0 4px;}
+.cd-tour-ctrl .cd-btn.ghost{background:transparent;border-color:rgba(255,255,255,.2);color:#fff;}
+@media(max-width:960px){
+  .cd-root{flex-direction:column;}
+  .cd-side{width:100%;height:auto;position:relative;flex-direction:row;align-items:center;padding:12px 16px;overflow-x:auto;}
+  .cd-brand{padding:0 14px 0 0;}.cd-firm{display:none;}
+  .cd-nav{flex-direction:row;flex:none;gap:2px;}
+  .cd-navbtn span{display:none;}.cd-navbtn{padding:9px;}
+  .cd-side-foot{flex-direction:row;margin-left:auto;}
+  .cd-roleswitch{max-width:150px;}
+  .cd-main{padding:22px 18px 40px;}
+  .cd-stats{grid-template-columns:1fr 1fr;}
+  .cd-grid2,.cd-alist{grid-template-columns:1fr;}
+  .cd-h1{font-size:23px;}.cd-cal-cell{min-height:70px;}
+  .cd-form-row{grid-template-columns:1fr 1fr;}
+}
+@media(max-width:480px){.cd-form-row{grid-template-columns:1fr;}.cd-cal-month{min-width:120px;font-size:15px;}.cd-contact-row{grid-template-columns:1fr 1fr;}}
+`;
+
+
+/* ---------------- mount ---------------- */
+const _root = document.getElementById("root");
+ReactDOM.createRoot(_root).render(React.createElement(App));
+
+</script>
+</body>
+</html>
